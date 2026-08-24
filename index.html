@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>3D 육지 거북이</title>
+<style>
+  :root {
+    color-scheme: light;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: #dff0c8;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    overflow: hidden;
+  }
+  #scene-container {
+    position: fixed;
+    inset: 0;
+  }
+  #scene-container canvas {
+    display: block;
+  }
+  .ui {
+    position: fixed;
+    top: 18px;
+    left: 18px;
+    z-index: 10;
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(6px);
+    padding: 14px 18px;
+    border-radius: 14px;
+    box-shadow: 0 6px 24px rgba(30, 50, 20, 0.18);
+    max-width: min(320px, calc(100vw - 36px));
+  }
+  .ui h1 {
+    margin: 0 0 4px;
+    font-size: 17px;
+    color: #2f4a1f;
+  }
+  .ui p {
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: #4a5c3d;
+  }
+  #toggle-rotate {
+    position: fixed;
+    bottom: 20px;
+    left: 18px;
+    z-index: 10;
+    border: none;
+    background: #3f6b2c;
+    color: #fff;
+    font-size: 13px;
+    padding: 10px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(30, 50, 20, 0.3);
+  }
+  #toggle-rotate.active { background: #4a7d34; }
+  #toggle-rotate:hover { filter: brightness(1.08); }
+  #loading {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #dff0c8;
+    color: #3f6b2c;
+    font-size: 15px;
+    z-index: 20;
+  }
+</style>
+</head>
+<body>
+  <div id="loading">거북이를 불러오는 중… 🐢</div>
+  <div id="scene-container"></div>
+
+  <div class="ui">
+    <h1>🐢 3D 육지 거북이</h1>
+    <p>마우스(또는 손가락)로 드래그하면 시점을 돌릴 수 있고, 스크롤로 확대/축소할 수 있어요.</p>
+  </div>
+  <button id="toggle-rotate" class="active">⏸ 회전 멈추기</button>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="turtle-scene.js"></script>
+</body>
+</html>
