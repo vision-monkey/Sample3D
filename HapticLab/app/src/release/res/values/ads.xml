@@ -1,10 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!--
-        TODO before publishing: replace with the IDs from your AdMob account
-        (AdMob > Apps > App settings: App ID, Ad units > Interstitial: Ad unit ID).
-        Until then the release build keeps showing Google test ads.
-    -->
-    <string name="admob_app_id" translatable="false">ca-app-pub-3940256099942544~3347511713</string>
-    <string name="admob_interstitial_id" translatable="false">ca-app-pub-3940256099942544/1033173712</string>
+    <!-- Real AdMob IDs for 진동 도감 (release builds only; debug builds keep Google's test IDs). -->
+    <string name="admob_app_id" translatable="false">ca-app-pub-3948913814367331~6066762540</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-3948913814367331/9307169406</string>
 </resources>

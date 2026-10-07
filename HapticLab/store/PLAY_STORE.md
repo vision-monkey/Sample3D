@@ -46,7 +46,7 @@ keytool -genkeypair -v -keystore vibrationdex-upload.jks \
 
 1. [AdMob](https://admob.google.com) 가입 → **앱 추가** (Android, "진동 도감").
 2. **광고 단위 추가 → 전면 광고** 생성.
-3. 발급된 두 ID를 `app/src/release/res/values/ads.xml`에 입력:
+3. ✅ 완료 — 실제 ID가 `app/src/release/res/values/ads.xml`에 들어가 있습니다:
    - `admob_app_id` = 앱 ID (`ca-app-pub-xxxxxxxx~yyyyyyyy`)
    - `admob_interstitial_id` = 광고 단위 ID (`ca-app-pub-xxxxxxxx/zzzzzzzz`)
 4. 디버그 빌드는 항상 Google **테스트 광고**를 씁니다. 실제 광고를 직접 눌러 보면 계정이 정지될 수 있으니 테스트는 디버그 APK로 하세요.
