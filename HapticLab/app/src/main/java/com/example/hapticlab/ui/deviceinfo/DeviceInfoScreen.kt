@@ -35,7 +35,7 @@ fun DeviceInfoScreen(viewModel: DeviceInfoViewModel, modifier: Modifier = Modifi
         Column(Modifier.padding(top = 8.dp, bottom = 4.dp)) {
             Text("Device Info", style = MaterialTheme.typography.headlineMedium)
             Text(
-                "What the haptic hardware reports, and which API Haptic Lab uses.",
+                "What the haptic hardware reports, and which API the app uses.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

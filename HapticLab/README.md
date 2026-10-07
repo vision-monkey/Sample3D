@@ -1,4 +1,6 @@
-# Haptic Lab
+# 진동 도감 (Haptic Lab)
+
+> Google Play release checklist, listing text and privacy policy: see [`store/PLAY_STORE.md`](store/PLAY_STORE.md).
 
 A developer tool for feeling — and comparing — 50 distinct haptic patterns on a real Android phone
 (tuned on Galaxy-class LRA actuators). Button clicks, water drops, bouncing balls, heartbeats, springs,

@@ -20,6 +20,10 @@ jobs:
     defaults:
       run:
         working-directory: HapticLab
+    env:
+      # Monotonic versionCode for Google Play uploads.
+      VERSION_CODE: ${{ github.run_number }}
+      HAS_UPLOAD_KEY: ${{ secrets.UPLOAD_KEYSTORE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v5
 
@@ -33,7 +37,6 @@ jobs:
         run: |
           SDKMANAGER="$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -1)"
           yes | "$SDKMANAGER" --licenses > /dev/null || true
-          "$SDKMANAGER" --list 2>/dev/null | grep -E "^\s*platforms;android-3[6-9]" | sort -u || true
 
       - uses: gradle/actions/setup-gradle@v4
 
@@ -43,24 +46,55 @@ jobs:
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace
 
-      - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk HapticLab-debug.apk
+      - name: Restore Play upload key
+        if: env.HAS_UPLOAD_KEY == 'true'
+        env:
+          UPLOAD_KEYSTORE_BASE64: ${{ secrets.UPLOAD_KEYSTORE_BASE64 }}
+        run: |
+          echo "$UPLOAD_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          echo "UPLOAD_KEYSTORE_FILE=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
+
+      # Always built so R8/minification problems surface on every push; signed only with the key.
+      - name: Build release bundle (AAB) for Google Play
+        env:
+          UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.UPLOAD_KEYSTORE_PASSWORD }}
+          UPLOAD_KEY_ALIAS: ${{ secrets.UPLOAD_KEY_ALIAS }}
+          UPLOAD_KEY_PASSWORD: ${{ secrets.UPLOAD_KEY_PASSWORD }}
+        run: ./gradlew bundleRelease --stacktrace
+
+      - name: Generate Play Store graphics
+        run: |
+          sudo apt-get install -y -qq fonts-noto-cjk > /dev/null
+          python3 -m pip install --quiet pillow
+          FONT="$(fc-list :lang=ko file | grep -i 'NotoSansCJK-Bold' | head -1 | cut -d: -f1)"
+          python3 store/make_graphics.py "${FONT:-/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc}" out
+
+      - name: Collect outputs
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/debug/app-debug.apk out/HapticLab-debug.apk
+          if [ "$HAS_UPLOAD_KEY" = "true" ]; then
+            cp app/build/outputs/bundle/release/app-release.aab "out/VibrationDex-${VERSION_CODE}.aab"
+          fi
+          rm -f "$RUNNER_TEMP/upload.jks"
+          ls -la out
 
       - uses: actions/upload-artifact@v4
         with:
-          name: HapticLab-debug-apk
-          path: HapticLab/HapticLab-debug.apk
+          name: vibration-dex-${{ github.run_number }}
+          path: HapticLab/out/
 
-      - name: Publish APK to a GitHub release
+      - name: Publish to a GitHub release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: haptic-lab-build-${{ github.run_number }}
-          name: Haptic Lab debug build ${{ github.run_number }}
+          name: 진동 도감 build ${{ github.run_number }}
           target_commitish: ${{ github.sha }}
           prerelease: false
           make_latest: true
           body: |
-            Haptic Lab debug APK built from ${{ github.sha }}.
+            진동 도감 (Haptic Lab) build ${{ github.run_number }} from ${{ github.sha }}.
 
-            Always-latest download: https://github.com/${{ github.repository }}/releases/latest/download/HapticLab-debug.apk
-          files: HapticLab/HapticLab-debug.apk
+            - Phone install (debug APK): https://github.com/${{ github.repository }}/releases/latest/download/HapticLab-debug.apk
+            - Google Play upload: the signed `.aab` attached here (only when the upload key secrets are configured).
+          files: HapticLab/out/*

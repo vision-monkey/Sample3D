@@ -31,12 +31,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.hapticlab.R
 import com.example.hapticlab.data.HapticCategory
 import com.example.hapticlab.data.HapticPattern
 import com.example.hapticlab.haptic.HapticCapability
@@ -141,7 +143,7 @@ fun HomeContent(
 @Composable
 private fun Header(capability: HapticCapability, total: Int) {
     Column(Modifier.padding(top = 8.dp, bottom = 4.dp)) {
-        Text("Haptic Lab", style = MaterialTheme.typography.headlineMedium)
+        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(2.dp))
         Text(
             capability.displayName,
