@@ -20,8 +20,8 @@ import com.example.hapticlab.ui.theme.MonoStyle
 
 /** "Device Haptic Capability" summary shown at the top of the library. */
 @Composable
-fun CapabilityCard(capability: HapticCapability, modifier: Modifier = Modifier) {
-    var expanded by rememberSaveable { mutableStateOf(true) }
+fun CapabilityCard(capability: HapticCapability, modifier: Modifier = Modifier, initiallyExpanded: Boolean = true) {
+    var expanded by rememberSaveable { mutableStateOf(initiallyExpanded) }
     SectionCard(
         title = "Device Haptic Capability",
         subtitle = "${capability.displayName} · Android ${capability.androidVersion} (API ${capability.apiLevel})",

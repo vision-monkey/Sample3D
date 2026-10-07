@@ -1,29 +1,29 @@
 package com.example.hapticlab.ui.home
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,7 +42,6 @@ import com.example.hapticlab.data.HapticPattern
 import com.example.hapticlab.haptic.HapticCapability
 import com.example.hapticlab.haptic.PlaybackState
 import com.example.hapticlab.ui.components.CapabilityCard
-import com.example.hapticlab.ui.theme.MonoStyle
 import com.example.hapticlab.viewmodel.HomeUiState
 import com.example.hapticlab.viewmodel.HomeViewModel
 
@@ -60,7 +60,6 @@ fun HomeScreen(
         onQueryChange = viewModel::onQueryChange,
         onCategorySelected = viewModel::onCategorySelected,
         onFavoritesOnlyChange = viewModel::onFavoritesOnlyChange,
-        onToggleFavorite = viewModel::toggleFavorite,
         onPlay = viewModel::play,
         onStop = viewModel::stop,
         onOpenPattern = onOpenPattern,
@@ -76,20 +75,23 @@ fun HomeContent(
     onQueryChange: (String) -> Unit,
     onCategorySelected: (HapticCategory?) -> Unit,
     onFavoritesOnlyChange: (Boolean) -> Unit,
-    onToggleFavorite: (String) -> Unit,
     onPlay: (HapticPattern) -> Unit,
     onStop: () -> Unit,
     onOpenPattern: (HapticPattern) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LazyColumn(
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 96.dp),
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 16.dp, bottom = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        item(key = "header") { Header(capability, state.totalCount) }
-        item(key = "capability") { CapabilityCard(capability) }
-        item(key = "search") {
+        item(key = "header", span = { GridItemSpan(maxLineSpan) }) { Header(capability, state.totalCount) }
+        item(key = "capability", span = { GridItemSpan(maxLineSpan) }) {
+            CapabilityCard(capability, initiallyExpanded = false)
+        }
+        item(key = "search", span = { GridItemSpan(maxLineSpan) }) {
             OutlinedTextField(
                 value = state.query,
                 onValueChange = onQueryChange,
@@ -105,7 +107,7 @@ fun HomeContent(
                 shape = RoundedCornerShape(16.dp),
             )
         }
-        item(key = "filters") {
+        item(key = "filters", span = { GridItemSpan(maxLineSpan) }) {
             CategoryFilterRow(
                 selected = state.category,
                 favoritesOnly = state.favoritesOnly,
@@ -114,25 +116,23 @@ fun HomeContent(
                 onFavoritesOnlyChange = onFavoritesOnlyChange,
             )
         }
-        item(key = "count") {
+        item(key = "count", span = { GridItemSpan(maxLineSpan) }) {
             Text(
-                "${state.patterns.size} of ${state.totalCount} patterns",
+                "${state.patterns.size} of ${state.totalCount} · tap to play, long-press for details",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         if (state.patterns.isEmpty()) {
-            item(key = "empty") { EmptyState(state.favoritesOnly) }
+            item(key = "empty", span = { GridItemSpan(maxLineSpan) }) { EmptyState(state.favoritesOnly) }
         }
         items(state.patterns, key = { it.id }) { pattern ->
             val playingThis = playback.isPlaying && playback.sourceId == pattern.id
-            PatternCard(
+            PatternTile(
                 pattern = pattern,
-                isFavorite = pattern.id in state.favorites,
                 isPlaying = playingThis,
-                onClick = { onOpenPattern(pattern) },
-                onPlay = { if (playingThis) onStop() else onPlay(pattern) },
-                onToggleFavorite = { onToggleFavorite(pattern.id) },
+                onClick = { if (playingThis) onStop() else onPlay(pattern) },
+                onLongClick = { onOpenPattern(pattern) },
             )
         }
     }
@@ -207,86 +207,52 @@ private fun EmptyState(favoritesOnly: Boolean) {
     }
 }
 
+/** Compact grid tile: icon, number and name only. Tap plays, long-press opens the detail screen. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun PatternCard(
+fun PatternTile(
     pattern: HapticPattern,
-    isFavorite: Boolean,
     isPlaying: Boolean,
     onClick: () -> Unit,
-    onPlay: () -> Unit,
-    onToggleFavorite: () -> Unit,
+    onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    val shape = RoundedCornerShape(16.dp)
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(0.95f)
+            .clip(shape)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+        shape = shape,
+        color = if (isPlaying) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            width = if (isPlaying) 2.dp else 1.dp,
+            color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+        ),
     ) {
-        Column(Modifier.padding(start = 16.dp, top = 14.dp, end = 8.dp, bottom = 14.dp)) {
-            Row(verticalAlignment = Alignment.Top) {
-                Box(
-                    Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(pattern.emoji, fontSize = 22.sp)
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "${pattern.number}. ${pattern.name}",
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        pattern.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                IconButton(onClick = onToggleFavorite) {
-                    Text(
-                        if (isFavorite) "★" else "☆",
-                        fontSize = 22.sp,
-                        color = if (isFavorite) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        pattern.sequenceSummary,
-                        style = MonoStyle,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        "${pattern.category.label} · ~${pattern.estimatedDurationMs} ms",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                FilledTonalButton(
-                    onClick = onPlay,
-                    modifier = Modifier
-                        .padding(end = 8.dp)
-                        .height(44.dp),
-                    shape = RoundedCornerShape(14.dp),
-                ) {
-                    Text(
-                        if (isPlaying) "■ STOP" else "▶ PLAY",
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
+        Box(Modifier.padding(8.dp)) {
+            Text(
+                "${pattern.number}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.align(Alignment.TopStart),
+            )
+            Column(
+                Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(pattern.emoji, fontSize = 30.sp)
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    pattern.name,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    minLines = 2,
+                )
             }
         }
     }

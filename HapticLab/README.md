@@ -129,8 +129,9 @@ exactly what your phone reports and which API each pattern uses.
 
 ## Haptic Lab UI
 
-* **Library** — header with device name and engine path, *Device Haptic Capability* card, search
-  (name / description / category), category filter, ★ favorites filter, 50 cards with ▶ PLAY.
+* **Library** — header with device name and engine path, a collapsible *Device Haptic Capability*
+  card, search (name / description / category), category filter, ★ favorites filter, and a compact
+  grid of all 50 patterns (icon, number, name). Tap a tile to play it, long-press to open its detail.
 * **Detail** — category, description, duration, designed implementation vs. the path used on this
   device, the full primitive/envelope sequence (live-scaled by the intensity slider), fallback data,
   repeat options and a large TEST HAPTIC / STOP button.
