@@ -28,12 +28,12 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      # The runner image ships the Android SDK; only add the platform we compile against.
-      - name: Install Android SDK platform 37
+      # The runner image ships the Android SDK; AGP downloads the compileSdk platform itself.
+      - name: Accept Android SDK licenses
         run: |
           SDKMANAGER="$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -1)"
           yes | "$SDKMANAGER" --licenses > /dev/null || true
-          "$SDKMANAGER" "platforms;android-37"
+          "$SDKMANAGER" --list 2>/dev/null | grep -E "^\s*platforms;android-3[6-9]" | sort -u || true
 
       - uses: gradle/actions/setup-gradle@v4
 
