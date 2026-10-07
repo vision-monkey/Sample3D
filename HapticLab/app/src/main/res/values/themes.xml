@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.HapticLab" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <!-- UI must never add its own haptics on top of the pattern under test. -->
+        <item name="android:hapticFeedbackEnabled">false</item>
+    </style>
+</resources>
