@@ -57,5 +57,10 @@ jobs:
           tag_name: haptic-lab-build-${{ github.run_number }}
           name: Haptic Lab debug build ${{ github.run_number }}
           target_commitish: ${{ github.sha }}
-          prerelease: true
+          prerelease: false
+          make_latest: true
+          body: |
+            Haptic Lab debug APK built from ${{ github.sha }}.
+
+            Always-latest download: https://github.com/${{ github.repository }}/releases/latest/download/HapticLab-debug.apk
           files: HapticLab/HapticLab-debug.apk
