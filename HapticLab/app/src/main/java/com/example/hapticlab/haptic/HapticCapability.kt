@@ -3,22 +3,22 @@ package com.example.hapticlab.haptic
 /** Which Android API family the engine uses to render a pattern. */
 enum class HapticApiPath(val label: String, val detail: String) {
     ENVELOPE(
-        "VibrationEffect.BasicEnvelopeBuilder",
-        "Android 16 envelope effects (intensity + sharpness control points)",
+        "진동 곡선",
+        "Android 16 VibrationEffect.BasicEnvelopeBuilder (세기 + 선명도 곡선)",
     ),
     COMPOSITION(
-        "VibrationEffect.Composition",
-        "Primitive composition (startComposition / addPrimitive)",
+        "기본 진동 조합",
+        "VibrationEffect.Composition (startComposition / addPrimitive)",
     ),
     WAVEFORM_AMPLITUDE(
-        "Waveform Fallback",
-        "createWaveform(timings, amplitudes) with amplitude control",
+        "세기 파형",
+        "createWaveform(timings, amplitudes) — 세기 조절 지원",
     ),
     WAVEFORM_ON_OFF(
-        "Waveform Fallback (On/Off)",
-        "createWaveform(timings) — device has no amplitude control",
+        "켜기/끄기 파형",
+        "createWaveform(timings) — 세기 조절 미지원",
     ),
-    NONE("No Vibrator", "This device reports no vibrator"),
+    NONE("진동 모터 없음", "이 기기에는 진동 모터가 없어요"),
 }
 
 /** Limits reported by `Vibrator.getEnvelopeEffectInfo()` (API 36). */
@@ -92,7 +92,7 @@ data class HapticCapability(
         val Unknown = HapticCapability(
             manufacturer = "Unknown",
             model = "Unknown",
-            displayName = "Unknown device",
+            displayName = "알 수 없는 기기",
             androidVersion = "?",
             apiLevel = 0,
             hasVibrator = false,

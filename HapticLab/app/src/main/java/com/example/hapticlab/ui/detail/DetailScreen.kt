@@ -68,9 +68,9 @@ fun DetailScreen(viewModel: DetailViewModel, onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(pattern?.name ?: "Unknown pattern") },
+                title = { Text(pattern?.name ?: "알 수 없는 진동") },
                 navigationIcon = {
-                    TextButton(onClick = onBack) { Text("←  Back") }
+                    TextButton(onClick = onBack) { Text("←  뒤로") }
                 },
                 actions = {
                     if (pattern != null) {
@@ -90,7 +90,7 @@ fun DetailScreen(viewModel: DetailViewModel, onBack: () -> Unit) {
                 Surface(tonalElevation = 3.dp, shadowElevation = 8.dp) {
                     PlayStopButton(
                         isPlaying = playback.isPlaying && playback.sourceId == pattern.id,
-                        playLabel = "TEST HAPTIC",
+                        playLabel = "진동 느껴보기",
                         onPlay = viewModel::play,
                         onStop = viewModel::stop,
                         enabled = intensity > 0f && viewModel.capability.hasVibrator,
@@ -103,7 +103,7 @@ fun DetailScreen(viewModel: DetailViewModel, onBack: () -> Unit) {
         },
     ) { padding ->
         if (pattern == null) {
-            Text("Pattern not found", Modifier.padding(padding).padding(24.dp))
+            Text("진동을 찾을 수 없어요", Modifier.padding(padding).padding(24.dp))
         } else {
             DetailBody(
                 pattern = pattern,
@@ -112,7 +112,7 @@ fun DetailScreen(viewModel: DetailViewModel, onBack: () -> Unit) {
                 repeat = repeat,
                 status = if (playback.isPlaying && playback.sourceId == pattern.id) {
                     val total = playback.totalIterations?.toString() ?: "∞"
-                    "Playing ${playback.iteration}/$total via ${playback.path?.label.orEmpty()}"
+                    "재생 중 ${playback.iteration}/$total · ${playback.path?.label.orEmpty()}"
                 } else {
                     null
                 },
@@ -171,26 +171,26 @@ private fun Hero(pattern: HapticPattern) {
 
 @Composable
 private fun Overview(viewModel: DetailViewModel, pattern: HapticPattern) {
-    SectionCard("Overview") {
+    SectionCard("소개") {
         Text(pattern.description, style = MaterialTheme.typography.bodyLarge)
         HorizontalDivider(Modifier.padding(vertical = 10.dp), color = MaterialTheme.colorScheme.outlineVariant)
-        InfoRow("Category", pattern.category.label)
+        InfoRow("종류", pattern.category.label)
         val duration = when (viewModel.path) {
             HapticApiPath.COMPOSITION -> viewModel.compositionDurationMs ?: pattern.estimatedDurationMs
             HapticApiPath.ENVELOPE -> pattern.envelope?.durationMs ?: pattern.estimatedDurationMs
             HapticApiPath.WAVEFORM_AMPLITUDE, HapticApiPath.WAVEFORM_ON_OFF -> pattern.waveform.durationMs
             else -> pattern.estimatedDurationMs
         }
-        InfoRow("Duration", "~$duration ms")
-        InfoRow("Peak intensity", String.format(Locale.US, "%.2f", pattern.intensity))
-        InfoRow("Implementation", pattern.patternType.label)
-        InfoRow("On this device") {
+        InfoRow("길이", "약 ${duration}ms")
+        InfoRow("최대 세기", String.format(Locale.US, "%.2f", pattern.intensity))
+        InfoRow("만든 방식", pattern.patternType.label)
+        InfoRow("내 휴대폰에서") {
             Column(horizontalAlignment = Alignment.End) {
                 Text(viewModel.path?.label.orEmpty(), style = MonoStyle, color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(4.dp))
                 SupportBadge(
                     supported = viewModel.primaryImplementationSupported,
-                    text = if (viewModel.primaryImplementationSupported) "Primary" else "Fallback",
+                    text = if (viewModel.primaryImplementationSupported) "기본 방식" else "대체 방식",
                 )
             }
         }
@@ -206,8 +206,8 @@ private fun Playback(
     status: String?,
 ) {
     SectionCard(
-        title = "Playback",
-        subtitle = "Global intensity scales every step while keeping their relative strength.",
+        title = "재생 설정",
+        subtitle = "전체 세기를 바꿔도 강약의 차이는 그대로 유지돼요.",
     ) {
         IntensitySlider(value = intensity, onValueChange = onIntensityChange)
         Spacer(Modifier.height(12.dp))
@@ -223,21 +223,21 @@ private fun Playback(
 private fun SequenceSection(pattern: HapticPattern, intensity: Float, path: HapticApiPath?) {
     when (pattern.patternType) {
         HapticPatternType.COMPOSITION ->
-            SectionCard("Sequence", subtitle = "Primitive composition · values at ${pct(intensity)} global intensity") {
+            SectionCard("진동 순서", subtitle = "기본 진동 조합 · 세기 ${pct(intensity)} 적용") {
                 CompositionSteps(pattern.composition.orEmpty(), intensity)
             }
 
         HapticPatternType.ENVELOPE ->
-            SectionCard("Envelope", subtitle = "Intensity / sharpness control points · ${pct(intensity)} global intensity") {
+            SectionCard("진동 곡선", subtitle = "세기(I)·선명도(S) 변화 · 세기 ${pct(intensity)} 적용") {
                 EnvelopePoints(pattern.envelope!!, intensity)
             }
 
         HapticPatternType.WAVEFORM ->
-            SectionCard("Waveform") { WaveformArrays(pattern.waveform, intensity) }
+            SectionCard("파형") { WaveformArrays(pattern.waveform, intensity) }
     }
     if (path != null && path != HapticApiPath.NONE) {
         Text(
-            "This device renders the pattern with ${path.label}.",
+            "이 휴대폰에서는 ${path.label} 방식으로 재생돼요.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 4.dp),
@@ -248,9 +248,9 @@ private fun SequenceSection(pattern: HapticPattern, intensity: Float, path: Hapt
 @Composable
 private fun FallbackSection(pattern: HapticPattern) {
     var expanded by rememberSaveable(pattern.id) { mutableStateOf(false) }
-    SectionCard("Fallback implementations", subtitle = "Used automatically when the primary API is unavailable") {
+    SectionCard("대체 방식", subtitle = "기본 방식을 지원하지 않는 휴대폰에서 자동으로 사용돼요") {
         if (!expanded) {
-            TextButton(onClick = { expanded = true }) { Text("Show fallback data") }
+            TextButton(onClick = { expanded = true }) { Text("대체 방식 보기") }
         } else {
             FallbackData(pattern, onHide = { expanded = false })
         }
@@ -260,21 +260,21 @@ private fun FallbackSection(pattern: HapticPattern) {
 @Composable
 private fun FallbackData(pattern: HapticPattern, onHide: () -> Unit) {
     if (pattern.patternType == HapticPatternType.ENVELOPE && pattern.composition != null) {
-        Text("Composition fallback", style = MaterialTheme.typography.labelLarge)
+        Text("기본 진동 조합", style = MaterialTheme.typography.labelLarge)
         Spacer(Modifier.height(6.dp))
         CompositionSteps(pattern.composition, 1f)
         Spacer(Modifier.height(12.dp))
     }
-    Text("Waveform fallback", style = MaterialTheme.typography.labelLarge)
+    Text("파형", style = MaterialTheme.typography.labelLarge)
     Spacer(Modifier.height(6.dp))
     WaveformArrays(pattern.waveform, 1f)
     Spacer(Modifier.height(6.dp))
     Text(
-        "Devices without amplitude control convert this to an on/off waveform; weaker segments become shorter pulses.",
+        "세기 조절이 안 되는 휴대폰에서는 켜기/끄기 진동으로 바꾸고, 약한 부분은 더 짧게 울려요.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    TextButton(onClick = onHide) { Text("Hide") }
+    TextButton(onClick = onHide) { Text("접기") }
 }
 
 @Composable
@@ -282,7 +282,7 @@ private fun CompositionSteps(steps: List<PrimitiveStep>, intensity: Float) {
     steps.forEachIndexed { index, step ->
         if (index > 0) {
             Text(
-                if (step.delayMs > 0) "   ↓ ${step.delayMs} ms delay" else "   ↓ immediately",
+                if (step.delayMs > 0) "   ↓ ${step.delayMs}ms 쉬고" else "   ↓ 바로 이어서",
                 style = MonoStyle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 2.dp),
@@ -291,7 +291,7 @@ private fun CompositionSteps(steps: List<PrimitiveStep>, intensity: Float) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(step.primitive.label, style = MonoStyle, fontWeight = FontWeight.Bold)
             Text(
-                if (intensity < 1f) "Intensity ${f2(step.scale)} → ${f3(step.scale * intensity)}" else "Intensity ${f2(step.scale)}",
+                if (intensity < 1f) "세기 ${f2(step.scale)} → ${f3(step.scale * intensity)}" else "세기 ${f2(step.scale)}",
                 style = MonoStyle,
             )
         }
@@ -300,7 +300,7 @@ private fun CompositionSteps(steps: List<PrimitiveStep>, intensity: Float) {
 
 @Composable
 private fun EnvelopePoints(envelope: EnvelopeSpec, intensity: Float) {
-    Text("Initial sharpness ${f2(envelope.initialSharpness)}", style = MonoStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text("시작 선명도 ${f2(envelope.initialSharpness)}", style = MonoStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Spacer(Modifier.height(4.dp))
     envelope.points.forEach { point ->
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -312,10 +312,10 @@ private fun EnvelopePoints(envelope: EnvelopeSpec, intensity: Float) {
 
 @Composable
 private fun WaveformArrays(waveform: WaveformSpec, intensity: Float) {
-    Text("timings (ms)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text("시간 (ms)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Text(waveform.timings.joinToString(prefix = "[", postfix = "]"), style = MonoStyle)
     Spacer(Modifier.height(6.dp))
-    Text("amplitudes (0–255)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text("세기 (0–255)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Text(
         WaveformAdapter.scale(waveform, intensity.coerceAtLeast(0.01f))
             .amplitudes.joinToString(prefix = "[", postfix = "]"),

@@ -73,9 +73,9 @@ fun PlaygroundScreen(viewModel: PlaygroundViewModel, modifier: Modifier = Modifi
     ) {
         item(key = "title") {
             Column(Modifier.padding(top = 8.dp, bottom = 4.dp)) {
-                Text("Playground", style = MaterialTheme.typography.headlineMedium)
+                Text("놀이터", style = MaterialTheme.typography.headlineMedium)
                 Text(
-                    "Design your own haptics from the device's primitives.",
+                    "기본 진동을 조합해서 나만의 진동을 만들어 보세요.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -102,15 +102,15 @@ fun PlaygroundScreen(viewModel: PlaygroundViewModel, modifier: Modifier = Modifi
         }
         item(key = "sequencer-header") {
             Column(Modifier.padding(top = 8.dp)) {
-                Text("Sequencer", style = MaterialTheme.typography.titleLarge)
+                Text("진동 만들기", style = MaterialTheme.typography.titleLarge)
                 Text(
-                    "Build a timeline of primitives. Uses the Repeat setting above.",
+                    "진동을 순서대로 쌓아 보세요. 반복은 위의 설정을 따라요.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (viewModel.sequenceUsesFallback(state)) {
                     Text(
-                        "Contains primitives this device doesn't support — the sequence will play through the waveform fallback.",
+                        "이 휴대폰이 지원하지 않는 진동이 있어서 비슷한 파형으로 대신 재생돼요.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(top = 4.dp),
@@ -122,7 +122,7 @@ fun PlaygroundScreen(viewModel: PlaygroundViewModel, modifier: Modifier = Modifi
             Column {
                 if (index > 0) {
                     Text(
-                        "   ↓ ${step.delayMs} ms",
+                        "   ↓ ${step.delayMs}ms",
                         style = MonoStyle,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 8.dp),
@@ -150,11 +150,11 @@ fun PlaygroundScreen(viewModel: PlaygroundViewModel, modifier: Modifier = Modifi
                     enabled = state.steps.size < PlaygroundViewModel.MAX_STEPS,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("+ Add Step")
+                    Text("+ 진동 추가")
                 }
                 PlayStopButton(
                     isPlaying = customPlaying && lastSource != PULSE_SOURCE,
-                    playLabel = "PLAY SEQUENCE",
+                    playLabel = "만든 진동 재생",
                     onPlay = {
                         lastSource = "sequence"
                         viewModel.playSequence()
@@ -182,25 +182,25 @@ private fun PulseDesigner(
     onPlay: () -> Unit,
     onStop: () -> Unit,
 ) {
-    SectionCard("Pulse Designer", subtitle = "Pick a primitive and shape it with intensity, duration and delay.") {
-        Text("Primitive", style = MaterialTheme.typography.labelLarge)
+    SectionCard("한 가지 진동", subtitle = "기본 진동을 고르고 세기·길이·간격을 바꿔 보세요.") {
+        Text("기본 진동", style = MaterialTheme.typography.labelLarge)
         Spacer(Modifier.height(6.dp))
         PrimitiveGrid(selected = state.primitive, capability = capability, onSelect = onSelectPrimitive)
         Spacer(Modifier.height(4.dp))
         FilterChip(
             selected = state.primitive == null,
             onClick = { onSelectPrimitive(null) },
-            label = { Text("RAW ONE-SHOT (any device)") },
+            label = { Text("그냥 부르르 (모든 휴대폰)") },
         )
         Text(
-            state.primitive?.feel ?: "Plain motor pulse via createOneShot-style waveform. Duration = pulse length.",
+            state.primitive?.feel ?: "모터를 그냥 켰다 끄는 진동이에요. 길이만큼 울려요.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(12.dp))
         IntensitySlider(value = state.intensity, onValueChange = onIntensity)
         LabeledSlider(
-            label = "Duration",
+            label = "길이",
             value = state.durationMs.toFloat(),
             onValueChange = { onDuration(it.roundToInt()) },
             valueText = "${state.durationMs} ms",
@@ -209,7 +209,7 @@ private fun PulseDesigner(
             endLabel = "${PlaygroundViewModel.MAX_DURATION_MS} ms",
         )
         LabeledSlider(
-            label = "Delay",
+            label = "간격",
             value = state.delayMs.toFloat(),
             onValueChange = { onDelay(it.roundToInt()) },
             valueText = "${state.delayMs} ms",
@@ -219,9 +219,9 @@ private fun PulseDesigner(
         )
         Text(
             if (state.primitive == null) {
-                "One ${state.durationMs} ms pulse; delay is the gap between repeats."
+                "${state.durationMs}ms 동안 한 번 울려요. 간격은 반복 사이 쉬는 시간이에요."
             } else {
-                "$hitCount × ${state.primitive.label} spaced ${state.delayMs} ms to fill ${state.durationMs} ms."
+                "${state.primitive.label} ${hitCount}번 · ${state.delayMs}ms 간격 · 총 ${state.durationMs}ms"
             },
             style = MonoStyle,
             color = MaterialTheme.colorScheme.primary,
@@ -231,14 +231,14 @@ private fun PulseDesigner(
         Spacer(Modifier.height(16.dp))
         PlayStopButton(
             isPlaying = isPlaying,
-            playLabel = "PLAY",
+            playLabel = "재생",
             onPlay = onPlay,
             onStop = onStop,
             enabled = state.intensity > 0f && capability.hasVibrator,
         )
         if (isPlaying) {
             Text(
-                "Iteration ${playback.iteration}/${playback.totalIterations ?: "∞"} · ${playback.path?.label.orEmpty()}",
+                "재생 중 ${playback.iteration}/${playback.totalIterations ?: "∞"} · ${playback.path?.label.orEmpty()}",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(top = 8.dp),
@@ -278,7 +278,7 @@ private fun PrimitiveGrid(
                         )
                         if (!supported) {
                             Text(
-                                "Not supported on this device",
+                                "이 휴대폰은 지원 안 해요",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = LocalStatusColors.current.unsupported,
                             )
@@ -322,7 +322,7 @@ private fun StepCard(
             }
             if (!supported) {
                 Text(
-                    "Not supported on this device",
+                    "이 휴대폰은 지원 안 해요",
                     style = MaterialTheme.typography.labelSmall,
                     color = LocalStatusColors.current.unsupported,
                 )
@@ -331,7 +331,7 @@ private fun StepCard(
                 IntensitySlider(value = step.intensity, onValueChange = onIntensity)
                 if (!isFirst) {
                     LabeledSlider(
-                        label = "Delay before",
+                        label = "앞 진동과 간격",
                         value = step.delayMs.toFloat(),
                         onValueChange = { onDelay(it.roundToInt()) },
                         valueText = "${step.delayMs} ms",
@@ -363,7 +363,7 @@ private fun PrimitiveDropdown(
                             Text(primitive.label, style = MonoStyle)
                             if (!supported) {
                                 Text(
-                                    "Not supported on this device",
+                                    "이 휴대폰은 지원 안 해요",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = LocalStatusColors.current.unsupported,
                                 )

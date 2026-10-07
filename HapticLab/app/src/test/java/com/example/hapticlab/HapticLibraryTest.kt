@@ -79,9 +79,9 @@ class HapticLibraryTest {
 
     @Test
     fun searchMatchesNameDescriptionAndCategory() {
-        assertTrue(HapticLibrary.find("heartbeat")!!.matches("heart"))
-        assertTrue(HapticLibrary.find("engine_rev")!!.matches("machine"))
-        assertTrue(HapticLibrary.find("ball_bounce")!!.matches("ROLLS"))
-        assertTrue(patterns.none { it.matches("zzz-no-match") })
+        assertTrue(HapticLibrary.find("heartbeat")!!.matches("심장"))
+        assertTrue(HapticLibrary.find("engine_rev")!!.matches("기계"))
+        assertTrue(HapticLibrary.find("ball_bounce")!!.matches("통"))
+        assertTrue(patterns.none { it.matches("없는검색어") })
     }
 }

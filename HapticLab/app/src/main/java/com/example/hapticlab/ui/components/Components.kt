@@ -51,7 +51,7 @@ fun SupportBadge(supported: Boolean, modifier: Modifier = Modifier, text: String
         color = if (supported) colors.supportedContainer else colors.unsupportedContainer,
     ) {
         Text(
-            text = text ?: if (supported) "Supported" else "Unsupported",
+            text = text ?: if (supported) "지원" else "미지원",
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
@@ -159,7 +159,7 @@ fun LabeledSlider(
 }
 
 @Composable
-fun IntensitySlider(value: Float, onValueChange: (Float) -> Unit, modifier: Modifier = Modifier, label: String = "Intensity") {
+fun IntensitySlider(value: Float, onValueChange: (Float) -> Unit, modifier: Modifier = Modifier, label: String = "세기") {
     LabeledSlider(
         label = label,
         value = value,
@@ -174,7 +174,7 @@ fun IntensitySlider(value: Float, onValueChange: (Float) -> Unit, modifier: Modi
 @Composable
 fun RepeatSelector(selected: RepeatMode, onSelect: (RepeatMode) -> Unit, modifier: Modifier = Modifier) {
     Column(modifier) {
-        Text("Repeat", style = MaterialTheme.typography.labelLarge)
+        Text("반복", style = MaterialTheme.typography.labelLarge)
         Spacer(Modifier.height(6.dp))
         Row(
             Modifier.horizontalScroll(rememberScrollState()),
@@ -190,7 +190,7 @@ fun RepeatSelector(selected: RepeatMode, onSelect: (RepeatMode) -> Unit, modifie
         }
         if (selected == RepeatMode.CONTINUOUS) {
             Text(
-                "Plays until you press STOP (auto-stops after 60 s).",
+                "멈춤을 누를 때까지 계속 울려요. (60초가 지나면 자동으로 멈춰요)",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp),
@@ -221,7 +221,7 @@ fun PlayStopButton(
                 contentColor = MaterialTheme.colorScheme.onError,
             ),
         ) {
-            Text("■  STOP", style = MaterialTheme.typography.titleMedium)
+            Text("■  멈춤", style = MaterialTheme.typography.titleMedium)
         }
     } else {
         Button(

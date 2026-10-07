@@ -9,7 +9,7 @@ sealed interface Destination {
 }
 
 enum class TopLevelTab(val label: String, val glyph: String, val destination: Destination) {
-    LIBRARY("Library", "≋", Destination.Library),
-    PLAYGROUND("Playground", "🧪", Destination.Playground),
-    DEVICE("Device", "ⓘ", Destination.DeviceInfo),
+    LIBRARY("도감", "≋", Destination.Library),
+    PLAYGROUND("놀이터", "🧪", Destination.Playground),
+    DEVICE("내 폰", "ⓘ", Destination.DeviceInfo),
 }

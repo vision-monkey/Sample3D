@@ -33,67 +33,66 @@ fun DeviceInfoScreen(viewModel: DeviceInfoViewModel, modifier: Modifier = Modifi
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(Modifier.padding(top = 8.dp, bottom = 4.dp)) {
-            Text("Device Info", style = MaterialTheme.typography.headlineMedium)
+            Text("내 휴대폰", style = MaterialTheme.typography.headlineMedium)
             Text(
-                "What the haptic hardware reports, and which API the app uses.",
+                "진동 모터가 알려 주는 정보와 앱이 사용하는 진동 방식이에요.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
-        SectionCard("Haptic Engine") {
+        SectionCard("진동 방식") {
             Text(c.bestPath.label, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
             Text(c.bestPath.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(10.dp))
-            Text("Library rendering on this device", style = MaterialTheme.typography.labelLarge)
+            Text("이 휴대폰에서 진동 50가지가 재생되는 방식", style = MaterialTheme.typography.labelLarge)
             HapticApiPath.entries.forEach { path ->
                 val count = viewModel.pathUsage[path] ?: 0
-                if (count > 0) InfoRow(path.label, "$count patterns")
+                if (count > 0) InfoRow(path.label, "${count}개")
             }
             Spacer(Modifier.height(4.dp))
             Text(
-                "Fallback order: Envelope (API 36) → Composition (API 30/31) → Amplitude waveform → On/Off waveform.",
+                "사용 순서: 진동 곡선(API 36) → 기본 진동 조합(API 30/31) → 세기 파형 → 켜기/끄기 파형",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
-        SectionCard("Device") {
-            InfoRow("Manufacturer", c.manufacturer)
-            InfoRow("Model", c.model)
-            InfoRow("Name", c.displayName)
-            InfoRow("Android Version", c.androidVersion)
-            InfoRow("API Level", c.apiLevel.toString())
+        SectionCard("기기") {
+            InfoRow("제조사", c.manufacturer)
+            InfoRow("모델", c.model)
+            InfoRow("이름", c.displayName)
+            InfoRow("Android 버전", c.androidVersion)
+            InfoRow("API 레벨", c.apiLevel.toString())
         }
 
-        SectionCard("Vibrator") {
-            SupportRow("Has Vibrator", c.hasVibrator)
-            SupportRow("Amplitude Control", c.hasAmplitudeControl)
-            SupportRow("Composition API (API 30+)", c.compositionApiAvailable)
-            SupportRow("Envelope Effects (API 36)", c.envelopeSupported)
-            SupportRow("Frequency Control (API 36)", c.frequencyControlSupported)
+        SectionCard("진동 모터") {
+            SupportRow("진동 모터", c.hasVibrator)
+            SupportRow("세기 조절", c.hasAmplitudeControl)
+            SupportRow("기본 진동 조합 (API 30+)", c.compositionApiAvailable)
+            SupportRow("진동 곡선 (API 36)", c.envelopeSupported)
+            SupportRow("주파수 조절 (API 36)", c.frequencyControlSupported)
             c.frequencyProfile?.let {
-                InfoRow("Frequency range", "${fmt(it.minFrequencyHz)}–${fmt(it.maxFrequencyHz)} Hz")
-                InfoRow("Max acceleration", "${fmt(it.maxOutputAccelerationGs)} g")
+                InfoRow("주파수 범위", "${fmt(it.minFrequencyHz)}–${fmt(it.maxFrequencyHz)} Hz")
+                InfoRow("최대 가속도", "${fmt(it.maxOutputAccelerationGs)} g")
             }
-            InfoRow("Resonant frequency", c.resonantFrequencyHz?.let { "${fmt(it)} Hz" } ?: "Unknown")
-            InfoRow("Q factor", c.qFactor?.let { fmt(it) } ?: "Unknown")
+            InfoRow("공진 주파수", c.resonantFrequencyHz?.let { "${fmt(it)} Hz" } ?: "알 수 없음")
+            InfoRow("Q factor", c.qFactor?.let { fmt(it) } ?: "알 수 없음")
             c.envelopeLimits?.let {
-                InfoRow("Envelope max points", it.maxControlPoints.toString())
-                InfoRow("Envelope point duration", "${it.minControlPointDurationMs}–${it.maxControlPointDurationMs} ms")
-                InfoRow("Envelope max duration", "${it.maxDurationMs} ms")
+                InfoRow("곡선 최대 점 개수", it.maxControlPoints.toString())
+                InfoRow("곡선 점 길이", "${it.minControlPointDurationMs}–${it.maxControlPointDurationMs} ms")
+                InfoRow("곡선 최대 길이", "${it.maxDurationMs} ms")
             }
         }
 
-        SectionCard("Primitives", subtitle = "Vibrator.arePrimitivesSupported() · durations from getPrimitiveDurations()") {
+        SectionCard("기본 진동 (Primitive)", subtitle = "휴대폰이 지원하는 기본 진동과 길이") {
             PrimitiveSupportList(c, showDurations = true)
         }
 
-        SectionCard("Notes") {
+        SectionCard("알아두세요") {
             Text(
-                "Vibration motors and manufacturer haptic tuning differ between models, so the same pattern can " +
-                    "feel different on another phone. Patterns are played with VibrationAttributes.USAGE_MEDIA " +
-                    "(Android 13+), so they follow the system media vibration intensity setting.",
+                "휴대폰마다 진동 모터와 제조사 설정이 달라서 같은 진동도 느낌이 조금씩 달라요. " +
+                    "진동이 약하면 [설정 › 소리 및 진동 › 진동 세기 › 미디어]를 확인해 주세요.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -23,32 +23,32 @@ import com.example.hapticlab.ui.theme.MonoStyle
 fun CapabilityCard(capability: HapticCapability, modifier: Modifier = Modifier, initiallyExpanded: Boolean = true) {
     var expanded by rememberSaveable { mutableStateOf(initiallyExpanded) }
     SectionCard(
-        title = "Device Haptic Capability",
+        title = "내 휴대폰 진동 기능",
         subtitle = "${capability.displayName} · Android ${capability.androidVersion} (API ${capability.apiLevel})",
         modifier = modifier,
     ) {
-        InfoRow("Haptic Engine") {
+        InfoRow("진동 방식") {
             Text(capability.bestPath.label, style = MonoStyle, color = MaterialTheme.colorScheme.primary)
         }
         if (!capability.hasVibrator) {
-            SupportRow("Vibrator", false)
+            SupportRow("진동 모터", false)
         } else {
-            SupportRow("Amplitude Control", capability.hasAmplitudeControl)
+            SupportRow("세기 조절", capability.hasAmplitudeControl)
             if (expanded) {
-                SupportRow("Envelope Effects (Android 16)", capability.envelopeSupported)
-                SupportRow("Frequency Control", capability.frequencyControlSupported)
+                SupportRow("진동 곡선 (Android 16)", capability.envelopeSupported)
+                SupportRow("주파수 조절", capability.frequencyControlSupported)
                 HorizontalDivider(Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 PrimitiveSupportList(capability)
             } else {
                 Text(
-                    "${capability.supportedPrimitives.size}/8 primitives supported",
+                    "기본 진동 8개 중 ${capability.supportedPrimitives.size}개 지원",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
         TextButton(onClick = { expanded = !expanded }, modifier = Modifier.align(Alignment.End)) {
-            Text(if (expanded) "Hide details" else "Show details")
+            Text(if (expanded) "접기" else "자세히 보기")
         }
     }
 }

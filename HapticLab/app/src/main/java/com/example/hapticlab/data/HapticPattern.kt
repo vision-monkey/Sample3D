@@ -5,13 +5,13 @@ import com.example.hapticlab.haptic.HapticPrimitive
 /** The implementation a pattern was designed for (its "primary" implementation). */
 enum class HapticPatternType(val label: String) {
     /** Android 16+ `VibrationEffect.BasicEnvelopeBuilder` (intensity + sharpness curve). */
-    ENVELOPE("Envelope (intensity + sharpness)"),
+    ENVELOPE("진동 곡선 (세기 + 선명도)"),
 
     /** Android 11+ `VibrationEffect.Composition` primitives with scale and delay. */
-    COMPOSITION("Primitive Composition"),
+    COMPOSITION("기본 진동 조합"),
 
     /** `VibrationEffect.createWaveform` with per-segment amplitudes. */
-    WAVEFORM("Amplitude Waveform"),
+    WAVEFORM("세기 파형"),
 }
 
 /**
@@ -113,8 +113,8 @@ data class HapticPattern(
     val sequenceSummary: String
         get() = when (patternType) {
             HapticPatternType.COMPOSITION -> summarizeSteps(composition!!)
-            HapticPatternType.ENVELOPE -> "Envelope · ${envelope!!.points.size} pts · ${envelope.durationMs} ms"
-            HapticPatternType.WAVEFORM -> "Waveform · ${waveform.timings.size} segments"
+            HapticPatternType.ENVELOPE -> "진동 곡선 · ${envelope!!.durationMs}ms"
+            HapticPatternType.WAVEFORM -> "파형 · ${waveform.durationMs}ms"
         }
 
     /** Duration estimate of the primary implementation using nominal primitive lengths. */

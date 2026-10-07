@@ -111,100 +111,100 @@ object HapticLibrary {
         pattern(
             1,
             "light_tick",
-            "Light Tick",
+            "살짝 톡",
             "·",
             BASIC,
-            "A barely-there tap. The lightest feedback in the library.",
+            "아주 살짝, 거의 안 느껴질 만큼 톡.",
             composition = listOf(p(TICK, 0.35f)),
             waveform = wave(8 to 90),
         ),
         pattern(
             2,
             "normal_tick",
-            "Normal Tick",
+            "톡",
             "•",
             BASIC,
-            "Standard UI tick, like a list item snapping into place.",
+            "목록을 넘길 때 같은 평범한 톡.",
             composition = listOf(p(TICK, 0.7f)),
             waveform = wave(10 to 170),
         ),
         pattern(
             3,
             "heavy_tick",
-            "Heavy Tick",
+            "묵직한 톡",
             "⬤",
             BASIC,
-            "Full-strength low tick: shorter than a click but with weight.",
+            "짧지만 무게감 있는 톡.",
             composition = listOf(p(LOW_TICK, 1.0f)),
             waveform = wave(14 to 240),
         ),
         pattern(
             4,
             "soft_click",
-            "Soft Click",
+            "부드러운 딸깍",
             "🔘",
             BASIC,
-            "Gentle button press with a cushioned attack.",
+            "푹신한 버튼을 누르는 느낌.",
             composition = listOf(p(CLICK, 0.45f)),
             waveform = wave(6 to 60, 12 to 130, 8 to 50),
         ),
         pattern(
             5,
             "mechanical_click",
-            "Mechanical Click",
+            "기계식 딸깍",
             "⌨️",
             BASIC,
-            "Hard switch actuation followed by a light release snap.",
+            "키보드 스위치처럼 딸깍 눌리고 톡 올라와요.",
             composition = listOf(p(CLICK, 1.0f), p(TICK, 0.55f, 30)),
             waveform = wave(12 to 255, 30 to 0, 8 to 150),
         ),
         pattern(
             6,
             "heavy_click",
-            "Heavy Click",
+            "묵직한 딸깍",
             "🔲",
             BASIC,
-            "A big, weighty button: crisp edge with a deep body.",
+            "크고 무거운 버튼을 꾹 누르는 느낌.",
             composition = listOf(p(CLICK, 1.0f), p(THUD, 0.5f)),
             waveform = wave(14 to 255, 22 to 200, 14 to 90),
         ),
         pattern(
             7,
             "double_click",
-            "Double Click",
+            "딸깍딸깍",
             "⏸",
             BASIC,
-            "Tok-tok. Two equal clicks 90 ms apart.",
+            "똑같은 딸깍 두 번.",
             composition = listOf(p(CLICK, 0.9f), p(CLICK, 0.9f, 90)),
             waveform = wave(12 to 230, 90 to 0, 12 to 230),
         ),
         pattern(
             8,
             "triple_click",
-            "Triple Click",
+            "딸깍 세 번",
             "⁂",
             BASIC,
-            "Tok-tok-tok. Three quick, even clicks.",
+            "빠르게 딸깍딸깍딸깍.",
             composition = listOf(p(CLICK, 0.9f), p(CLICK, 0.9f, 70), p(CLICK, 0.9f, 70)),
             waveform = wave(12 to 230, 70 to 0, 12 to 230, 70 to 0, 12 to 230),
         ),
         pattern(
             9,
             "toggle_on",
-            "Toggle On",
+            "스위치 켜기",
             "🟢",
             BASIC,
-            "Thumb slides and climbs, then snaps into the ON detent.",
+            "스르륵 올라가다 딸깍! 켜졌어요.",
             composition = listOf(p(LOW_TICK, 0.4f), p(QUICK_RISE, 0.5f), p(CLICK, 1.0f)),
             waveform = wave(10 to 70, 15 to 90, 15 to 130, 15 to 170, 8 to 0, 14 to 255),
         ),
         pattern(
             10,
             "toggle_off",
-            "Toggle Off",
+            "스위치 끄기",
             "⚪",
             BASIC,
-            "Release from the detent, energy falls away, soft landing.",
+            "딸깍 풀리고 스르륵 내려가요.",
             composition = listOf(p(CLICK, 0.7f), p(QUICK_FALL, 0.5f), p(LOW_TICK, 0.4f, 30)),
             waveform = wave(14 to 200, 8 to 0, 15 to 150, 15 to 100, 15 to 60, 30 to 0, 10 to 90),
         ),
@@ -213,26 +213,26 @@ object HapticLibrary {
         pattern(
             11,
             "light_tap",
-            "Light Tap",
+            "손가락 톡톡",
             "👆",
             IMPACT,
-            "A fingertip tapping the glass: soft, dull and short.",
+            "손끝으로 화면을 가볍게 두드려요.",
             composition = listOf(p(THUD, 0.3f)),
             waveform = wave(16 to 100, 12 to 40),
         ),
         pattern(
             12,
             "knock",
-            "Knock",
+            "노크",
             "🚪",
             IMPACT,
-            "One knuckle on a wooden door: solid hit with a woody rattle.",
+            "나무 문을 똑 한 번 두드려요.",
             composition = listOf(p(THUD, 0.8f), p(TICK, 0.3f, 20)),
             waveform = wave(22 to 230, 8 to 90, 20 to 0, 8 to 80),
         ),
         pattern(
-            13, "double_knock", "Double Knock", "✊", IMPACT,
-            "Knock-knock, with a natural 160 ms hand rhythm.",
+            13, "double_knock", "똑똑", "✊", IMPACT,
+            "문을 똑똑 두 번 두드려요.",
             composition = listOf(p(THUD, 0.85f), p(TICK, 0.3f, 15), p(THUD, 0.85f, 160), p(TICK, 0.3f, 15)),
             waveform = wave(22 to 230, 8 to 90, 160 to 0, 22 to 230, 8 to 90),
             repeatGapMs = 450,
@@ -240,26 +240,26 @@ object HapticLibrary {
         pattern(
             14,
             "thud",
-            "Thud",
+            "쿵",
             "🪨",
             IMPACT,
-            "A heavy object hits the floor. Deep and round.",
+            "무거운 물건이 바닥에 쿵.",
             composition = listOf(p(THUD, 1.0f)),
             waveform = wave(30 to 255, 20 to 160, 20 to 70),
         ),
         pattern(
             15,
             "punch",
-            "Punch",
+            "펀치",
             "👊",
             IMPACT,
-            "Short and violent: crisp contact, full body, instant cut-off.",
+            "짧고 세게 퍽!",
             composition = listOf(p(CLICK, 1.0f), p(THUD, 1.0f), p(QUICK_FALL, 0.6f)),
             waveform = wave(10 to 255, 30 to 255, 15 to 120),
         ),
         pattern(
-            16, "hammer", "Hammer", "🔨", IMPACT,
-            "Small lift, a massive strike and a metallic ring that decays.",
+            16, "hammer", "망치", "🔨", IMPACT,
+            "망치를 들었다가 쾅! 쇠가 울려요.",
             composition = listOf(
                 p(LOW_TICK, 0.3f),
                 p(THUD, 1.0f, 150),
@@ -273,33 +273,33 @@ object HapticLibrary {
         pattern(
             17,
             "collision",
-            "Collision",
+            "충돌",
             "🚗",
             IMPACT,
-            "Two bodies approach, crash, and scatter debris.",
+            "두 물체가 다가와 쾅 부딪혀요.",
             composition = listOf(p(QUICK_RISE, 0.5f), p(THUD, 1.0f), p(CLICK, 0.6f, 25), p(LOW_TICK, 0.35f, 40)),
             waveform = wave(15 to 60, 15 to 100, 15 to 140, 30 to 255, 25 to 0, 10 to 150, 40 to 0, 10 to 80),
         ),
         pattern(
             18,
             "drop",
-            "Drop",
+            "툭 떨어지기",
             "📦",
             IMPACT,
-            "Something small falls and settles with one little hop.",
+            "작은 물건이 툭 떨어져 한 번 통.",
             composition = listOf(p(THUD, 0.6f), p(LOW_TICK, 0.35f, 70)),
             waveform = wave(25 to 170, 70 to 0, 10 to 90),
         ),
         pattern(
-            19, "heavy_drop", "Heavy Drop", "🏋️", IMPACT,
-            "A heavy crate lands, rocks once and comes to rest.",
+            19, "heavy_drop", "쿵 떨어지기", "🏋️", IMPACT,
+            "무거운 상자가 쿵 떨어지고 흔들려요.",
             composition = listOf(p(THUD, 1.0f), p(THUD, 0.45f, 50), p(LOW_TICK, 0.3f, 90)),
             waveform = wave(45 to 255, 20 to 140, 50 to 0, 25 to 120, 90 to 0, 10 to 70),
             repeatGapMs = 400,
         ),
         pattern(
-            20, "explosion", "Explosion", "💣", IMPACT,
-            "Maximum attack, then a long rumbling decay that gets lower and softer.",
+            20, "explosion", "폭발", "💣", IMPACT,
+            "펑! 하고 우르르 잦아들어요.",
             type = ENVELOPE,
             envelope = env(
                 0.85f,
@@ -324,22 +324,22 @@ object HapticLibrary {
 
         // ===================================================== C. Bounce / Elastic
         pattern(
-            21, "ball_bounce", "Ball Bounce", "⚽", BOUNCE,
-            "A ball falls and bounces: each hit weaker, each gap shorter, then it rolls still.",
+            21, "ball_bounce", "공 튀기기", "⚽", BOUNCE,
+            "공이 통, 통, 통 점점 약하게 튀다가 멈춰요.",
             composition = listOf(p(THUD, 1.0f), p(THUD, 0.55f, 130), p(THUD, 0.3f, 90), p(LOW_TICK, 0.2f, 60)),
             waveform = wave(35 to 255, 130 to 0, 25 to 150, 90 to 0, 18 to 85, 60 to 0, 8 to 45),
             repeatGapMs = 600,
         ),
         pattern(
-            22, "basketball_bounce", "Basketball Bounce", "🏀", BOUNCE,
-            "Big, heavy, slow bounces with a long hang time between hits.",
+            22, "basketball_bounce", "농구공", "🏀", BOUNCE,
+            "크고 무거운 공이 천천히 쿵쿵 튀어요.",
             composition = listOf(p(THUD, 1.0f), p(THUD, 0.75f, 240), p(THUD, 0.5f, 180), p(THUD, 0.3f, 130)),
             waveform = wave(45 to 255, 240 to 0, 40 to 200, 180 to 0, 32 to 140, 130 to 0, 25 to 85),
             repeatGapMs = 700,
         ),
         pattern(
-            23, "ping_pong_bounce", "Ping Pong Bounce", "🏓", BOUNCE,
-            "Light, hard ball: crisp clicks that speed up into a rattle.",
+            23, "ping_pong_bounce", "탁구공", "🏓", BOUNCE,
+            "가벼운 공이 따닥따닥 점점 빨라져요.",
             composition = listOf(
                 p(CLICK, 0.9f),
                 p(CLICK, 0.75f, 130),
@@ -360,8 +360,8 @@ object HapticLibrary {
             repeatGapMs = 500,
         ),
         pattern(
-            24, "rubber_ball", "Rubber Ball", "🔴", BOUNCE,
-            "Super-elastic ball: many rapid bounces with geometric decay in force and time.",
+            24, "rubber_ball", "탱탱볼", "🔴", BOUNCE,
+            "탱탱볼이 여러 번 통통통 튀어요.",
             composition = listOf(
                 p(THUD, 1.0f), p(THUD, 0.78f, 150), p(THUD, 0.6f, 110), p(LOW_TICK, 0.65f, 80),
                 p(LOW_TICK, 0.5f, 58), p(LOW_TICK, 0.38f, 42), p(LOW_TICK, 0.28f, 30),
@@ -377,8 +377,8 @@ object HapticLibrary {
             repeatGapMs = 600,
         ),
         pattern(
-            25, "spring", "Spring", "🌀", BOUNCE,
-            "Slowly compressed, released with a snap, then a decaying boing oscillation.",
+            25, "spring", "스프링", "🌀", BOUNCE,
+            "꾹 눌렀다 놓으면 띠용~ 흔들려요.",
             type = ENVELOPE,
             envelope = env(
                 0.15f,
@@ -401,8 +401,8 @@ object HapticLibrary {
             repeatGapMs = 500,
         ),
         pattern(
-            26, "rubber_band", "Rubber Band", "🪢", BOUNCE,
-            "Creaking tension builds as it stretches, then it lets go with a slap.",
+            26, "rubber_band", "고무줄", "🪢", BOUNCE,
+            "쭉 당겼다가 탁! 놓아요.",
             composition = listOf(
                 p(LOW_TICK, 0.2f),
                 p(LOW_TICK, 0.3f, 70),
@@ -426,23 +426,23 @@ object HapticLibrary {
         pattern(
             27,
             "spin",
-            "Spin",
+            "빙글",
             "🔄",
             MOTION,
-            "A single wobbling spin-up.",
+            "한 번 빙글 돌아요.",
             composition = listOf(p(SPIN, 0.8f)),
             waveform = wave(20 to 110, 18 to 200, 18 to 120, 18 to 210, 20 to 120, 25 to 60),
         ),
         pattern(
-            28, "fast_spin", "Fast Spin", "💫", MOTION,
-            "Back-to-back spins gaining energy, like a top whipped faster.",
+            28, "fast_spin", "빙글빙글", "💫", MOTION,
+            "팽이가 점점 빨리 돌아요.",
             composition = listOf(p(SPIN, 0.7f), p(SPIN, 0.85f), p(SPIN, 1.0f)),
             waveform = waveOf((0 until 14).map { i -> 12 to if (i % 2 == 0) 140 + i * 8 else 70 + i * 4 } + listOf(20 to 90)),
             repeatGapMs = 150,
         ),
         pattern(
-            29, "slow_spin", "Slow Spin", "🎡", MOTION,
-            "A heavy wheel coasting: soft spins, each one slower and weaker.",
+            29, "slow_spin", "느린 회전", "🎡", MOTION,
+            "큰 바퀴가 천천히 돌다 멈춰 가요.",
             composition = listOf(p(SPIN, 0.55f), p(SPIN, 0.45f, 140), p(SPIN, 0.35f, 200)),
             waveform = wave(
                 25 to 80, 25 to 140, 25 to 80, 140 to 0,
@@ -452,8 +452,8 @@ object HapticLibrary {
             repeatGapMs = 400,
         ),
         pattern(
-            30, "rolling", "Rolling", "🎱", MOTION,
-            "A marble rolling over a slightly uneven table.",
+            30, "rolling", "데굴데굴", "🎱", MOTION,
+            "구슬이 책상 위를 굴러가요.",
             composition = listOf(
                 p(LOW_TICK, 0.35f), p(LOW_TICK, 0.28f, 45), p(LOW_TICK, 0.4f, 52), p(LOW_TICK, 0.3f, 40),
                 p(LOW_TICK, 0.38f, 58), p(LOW_TICK, 0.26f, 47), p(LOW_TICK, 0.36f, 55), p(LOW_TICK, 0.3f, 43),
@@ -469,8 +469,8 @@ object HapticLibrary {
             repeatGapMs = 40,
         ),
         pattern(
-            31, "gear", "Gear", "⚙️", MOTION,
-            "Teeth meshing: a clack and a dull thunk for every tooth.",
+            31, "gear", "톱니바퀴", "⚙️", MOTION,
+            "톱니가 하나씩 딱딱 맞물려 돌아요.",
             composition = listOf(
                 p(CLICK, 0.65f),
                 p(LOW_TICK, 0.5f, 15),
@@ -487,8 +487,8 @@ object HapticLibrary {
             repeatGapMs = 80,
         ),
         pattern(
-            32, "ratchet", "Ratchet", "🔧", MOTION,
-            "The pawl climbs each tooth with rising tension, then drops with a sharp clack.",
+            32, "ratchet", "라쳇", "🔧", MOTION,
+            "드르륵 올라가다 딱! 걸려요.",
             composition = (0 until 3).flatMap { i ->
                 listOf(p(LOW_TICK, 0.25f, if (i == 0) 0 else 110), p(TICK, 0.4f, 30), p(CLICK, 1.0f, 30))
             },
@@ -501,8 +501,8 @@ object HapticLibrary {
             repeatGapMs = 110,
         ),
         pattern(
-            33, "dial", "Dial", "🎛️", MOTION,
-            "A rotary knob moved one detent at a time: identical, precise steps.",
+            33, "dial", "다이얼", "🎛️", MOTION,
+            "다이얼을 한 칸씩 딸깍딸깍 돌려요.",
             composition = listOf(
                 p(TICK, 0.85f),
                 p(TICK, 0.85f, 130),
@@ -514,8 +514,8 @@ object HapticLibrary {
             repeatGapMs = 130,
         ),
         pattern(
-            34, "fast_dial", "Fast Dial", "⏩", MOTION,
-            "A flicked dial: detents accelerate, then coast to a stop.",
+            34, "fast_dial", "다이얼 휙", "⏩", MOTION,
+            "휙 돌린 다이얼이 빨라졌다가 멈춰요.",
             composition = listOf(0, 80, 62, 50, 40, 34, 30, 30, 32, 38, 48, 62).map { d -> p(TICK, 0.75f, d) },
             waveform = waveOf(pulses(List(12) { 8 }, List(12) { 190 }, listOf(0, 80, 62, 50, 40, 34, 30, 30, 32, 38, 48, 62))),
             repeatGapMs = 200,
@@ -523,8 +523,8 @@ object HapticLibrary {
 
         // ===================================================== E. Natural
         pattern(
-            35, "water_drop", "Single Water Drop", "💧", NATURAL,
-            "A bright 'plip' as the drop hits, then a soft, round 'plop' that fades.",
+            35, "water_drop", "물방울", "💧", NATURAL,
+            "똑! 떨어져서 퐁 퍼져요.",
             type = ENVELOPE,
             envelope = env(
                 1.0f,
@@ -539,8 +539,8 @@ object HapticLibrary {
             repeatGapMs = 700,
         ),
         pattern(
-            36, "water_drops", "Water Drops", "💦", NATURAL,
-            "Four drops from a leaky tap, each with its own size and timing.",
+            36, "water_drops", "물방울들", "💦", NATURAL,
+            "수도꼭지에서 물방울이 똑, 똑 떨어져요.",
             composition = listOf(
                 p(TICK, 0.9f),
                 p(LOW_TICK, 0.35f, 30),
@@ -560,8 +560,8 @@ object HapticLibrary {
             repeatGapMs = 250,
         ),
         pattern(
-            37, "rain", "Rain", "🌧️", NATURAL,
-            "Light rain on a window: irregular, tiny, never quite the same.",
+            37, "rain", "빗방울", "🌧️", NATURAL,
+            "창문에 작은 빗방울이 톡톡.",
             composition = listOf(
                 0 to 0.4f, 35 to 0.25f, 80 to 0.5f, 22 to 0.2f, 60 to 0.35f, 110 to 0.55f, 30 to 0.25f,
                 45 to 0.3f, 95 to 0.45f, 20 to 0.2f, 70 to 0.4f, 40 to 0.28f, 100 to 0.5f, 25 to 0.22f,
@@ -577,15 +577,15 @@ object HapticLibrary {
             repeatGapMs = 60,
         ),
         pattern(
-            38, "heartbeat", "Heartbeat", "❤️", NATURAL,
-            "Resting heart (~65 BPM): strong 'lub', short pause, softer 'dub', long rest.",
+            38, "heartbeat", "심장 박동", "❤️", NATURAL,
+            "쿵-쿵, 쉬고, 쿵-쿵.",
             composition = listOf(p(THUD, 1.0f), p(THUD, 0.55f, 130), p(THUD, 1.0f, 650), p(THUD, 0.55f, 130)),
             waveform = wave(40 to 255, 130 to 0, 30 to 150, 650 to 0, 40 to 255, 130 to 0, 30 to 150),
             repeatGapMs = 650,
         ),
         pattern(
-            39, "fast_heartbeat", "Fast Heartbeat", "💓", NATURAL,
-            "A nervous heart (~140 BPM): tighter lub-dub, almost no rest.",
+            39, "fast_heartbeat", "두근두근", "💓", NATURAL,
+            "긴장해서 심장이 빨리 뛰어요.",
             composition = listOf(
                 p(THUD, 1.0f),
                 p(THUD, 0.6f, 80),
@@ -602,8 +602,8 @@ object HapticLibrary {
             repeatGapMs = 280,
         ),
         pattern(
-            40, "breathing", "Breathing", "🫁", NATURAL,
-            "Slow inhale, brief hold, longer exhale. Smooth and low.",
+            40, "breathing", "숨쉬기", "🫁", NATURAL,
+            "천천히 들이쉬고, 길게 내쉬어요.",
             type = ENVELOPE,
             envelope = env(
                 0.05f,
@@ -622,8 +622,8 @@ object HapticLibrary {
 
         // ===================================================== F. Machine
         pattern(
-            41, "small_motor", "Small Motor", "🪫", MACHINE,
-            "A tiny DC motor: light, fast, high-pitched and steady.",
+            41, "small_motor", "작은 모터", "🪫", MACHINE,
+            "작은 장난감 모터가 위잉~",
             type = ENVELOPE,
             envelope = env(
                 0.9f,
@@ -637,8 +637,8 @@ object HapticLibrary {
             repeatGapMs = 0,
         ),
         pattern(
-            42, "electric_motor", "Electric Motor", "🔌", MACHINE,
-            "A stronger motor: spins up, runs with mid-pitch hum, spins down.",
+            42, "electric_motor", "전기 모터", "🔌", MACHINE,
+            "윙~ 돌기 시작해서 돌다가 멈춰요.",
             type = ENVELOPE,
             envelope = env(
                 0.4f,
@@ -654,8 +654,8 @@ object HapticLibrary {
             repeatGapMs = 0,
         ),
         pattern(
-            43, "engine_idle", "Engine Idle", "🚙", MACHINE,
-            "A car idling: low, lumpy, slightly uneven combustion pulses.",
+            43, "engine_idle", "자동차 시동", "🚙", MACHINE,
+            "부르릉 부르릉 엔진이 가만히 돌아요.",
             type = ENVELOPE,
             envelope = env(
                 0.1f,
@@ -683,8 +683,8 @@ object HapticLibrary {
             repeatGapMs = 0,
         ),
         pattern(
-            44, "engine_rev", "Engine Rev", "🏎️", MACHINE,
-            "RPM climbs: pulses get closer together, stronger and higher in pitch.",
+            44, "engine_rev", "엔진 부웅", "🏎️", MACHINE,
+            "부르르릉! 점점 빨라지고 세져요.",
             type = ENVELOPE,
             envelope = engineRevEnvelope(),
             composition = listOf(0, 120, 105, 90, 78, 66, 56, 48, 41, 35, 30, 26, 23, 20).mapIndexed { i, d ->
@@ -699,8 +699,8 @@ object HapticLibrary {
             repeatGapMs = 400,
         ),
         pattern(
-            45, "power_tool", "Power Tool", "🪚", MACHINE,
-            "A drill biting into wood: hard start, rough grinding load, wind-down.",
+            45, "power_tool", "전동 드릴", "🪚", MACHINE,
+            "드릴이 드르르륵 나무를 뚫어요.",
             type = ENVELOPE,
             envelope = env(
                 0.6f,
@@ -722,8 +722,8 @@ object HapticLibrary {
             repeatGapMs = 0,
         ),
         pattern(
-            46, "electric_toothbrush", "Electric Toothbrush", "🪥", MACHINE,
-            "Fine, high-frequency micro-vibration delivered in three sonic bursts.",
+            46, "electric_toothbrush", "전동 칫솔", "🪥", MACHINE,
+            "아주 잘게 떨리는 진동이 세 번.",
             type = ENVELOPE,
             envelope = env(
                 1.0f,
@@ -742,8 +742,8 @@ object HapticLibrary {
 
         // ===================================================== G. Game / Interaction
         pattern(
-            47, "gun_recoil", "Gun Recoil", "🔫", GAME,
-            "Sharp shot, hard kick into the hand, then small residual shakes.",
+            47, "gun_recoil", "총 반동", "🔫", GAME,
+            "탕! 손이 뒤로 밀리고 살짝 흔들려요.",
             composition = listOf(
                 p(CLICK, 1.0f),
                 p(THUD, 1.0f),
@@ -755,8 +755,8 @@ object HapticLibrary {
             repeatGapMs = 350,
         ),
         pattern(
-            48, "charging", "Charging", "🔋", GAME,
-            "Energy builds: intensity and sharpness climb together toward a peak.",
+            48, "charging", "충전", "🔋", GAME,
+            "에너지가 점점 차오르며 세져요.",
             type = ENVELOPE,
             envelope = env(
                 0.1f,
@@ -779,8 +779,8 @@ object HapticLibrary {
             repeatGapMs = 300,
         ),
         pattern(
-            49, "power_release", "Power Release", "⚡", GAME,
-            "Charge up, a split-second of silence, then everything released at once.",
+            49, "power_release", "에너지 발사", "⚡", GAME,
+            "모으고, 잠깐 멈췄다가, 한 번에 펑!",
             type = ENVELOPE,
             envelope = env(
                 0.2f,
@@ -801,8 +801,8 @@ object HapticLibrary {
             repeatGapMs = 600,
         ),
         pattern(
-            50, "magic_pulse", "Magic Pulse", "✨", GAME,
-            "Sci-fi shimmer: strong-crisp and weak-soft beats alternating, then fading.",
+            50, "magic_pulse", "마법 진동", "✨", GAME,
+            "반짝반짝, 강약이 번갈아 와요.",
             type = ENVELOPE,
             envelope = env(
                 0.9f,

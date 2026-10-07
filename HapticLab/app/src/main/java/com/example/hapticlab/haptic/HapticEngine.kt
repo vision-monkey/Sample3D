@@ -25,11 +25,11 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 enum class RepeatMode(val label: String, val count: Int?) {
-    OFF("OFF", 1),
-    TWICE("2x", 2),
-    THREE("3x", 3),
-    FIVE("5x", 5),
-    CONTINUOUS("Continuous", null),
+    OFF("한 번", 1),
+    TWICE("2번", 2),
+    THREE("3번", 3),
+    FIVE("5번", 5),
+    CONTINUOUS("계속", null),
 }
 
 data class PlaybackState(

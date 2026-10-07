@@ -98,11 +98,11 @@ fun HomeContent(
                 value = state.query,
                 onValueChange = onQueryChange,
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Search haptics...") },
+                placeholder = { Text("진동 찾기...") },
                 leadingIcon = { Text("🔍") },
                 trailingIcon = {
                     if (state.query.isNotEmpty()) {
-                        TextButton(onClick = { onQueryChange("") }) { Text("Clear") }
+                        TextButton(onClick = { onQueryChange("") }) { Text("지우기") }
                     }
                 },
                 singleLine = true,
@@ -120,7 +120,7 @@ fun HomeContent(
         }
         item(key = "count", span = { GridItemSpan(maxLineSpan) }) {
             Text(
-                "${state.patterns.size} of ${state.totalCount} · tap to play, long-press for details",
+                "${state.patterns.size}/${state.totalCount}개 · 누르면 진동, 길게 누르면 자세히",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -151,7 +151,7 @@ private fun Header(capability: HapticCapability, total: Int) {
             color = MaterialTheme.colorScheme.primary,
         )
         Text(
-            "$total Haptic Experiences",
+            "${total}가지 진동",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -171,14 +171,14 @@ private fun CategoryFilterRow(
             FilterChip(
                 selected = favoritesOnly,
                 onClick = { onFavoritesOnlyChange(!favoritesOnly) },
-                label = { Text(if (favoritesOnly) "★ Favorites ($favoriteCount)" else "☆ Favorites") },
+                label = { Text(if (favoritesOnly) "★ 즐겨찾기 ($favoriteCount)" else "☆ 즐겨찾기") },
             )
         }
         item {
             FilterChip(
                 selected = selected == null,
                 onClick = { onCategorySelected(null) },
-                label = { Text("All") },
+                label = { Text("전체") },
             )
         }
         items(HapticCategory.entries) { category ->
@@ -202,7 +202,7 @@ private fun EmptyState(favoritesOnly: Boolean) {
         Text(if (favoritesOnly) "☆" else "🔍", fontSize = 40.sp)
         Spacer(Modifier.height(8.dp))
         Text(
-            if (favoritesOnly) "No favorites yet. Tap ☆ on a pattern to add it." else "No haptics match your search.",
+            if (favoritesOnly) "아직 즐겨찾기가 없어요. 진동을 길게 눌러 ☆을 눌러 보세요." else "찾는 진동이 없어요.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
