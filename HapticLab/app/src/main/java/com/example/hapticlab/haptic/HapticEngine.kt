@@ -70,6 +70,11 @@ class HapticEngine(context: Context) {
     private val _playbackState = MutableStateFlow(PlaybackState.Idle)
     val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
 
+    private val _playCount = MutableStateFlow(0L)
+
+    /** Number of playbacks started since launch (each PLAY press counts once, repeats included). */
+    val playCount: StateFlow<Long> = _playCount.asStateFlow()
+
     fun getCapabilities(): HapticCapability = capability
 
     /** True when the device can render [pattern] at all (a waveform fallback always exists). */
@@ -165,6 +170,7 @@ class HapticEngine(context: Context) {
             playJob?.cancel()
             cancelVibrator()
             val myGeneration = ++generation
+            _playCount.value += 1
             val total = repeat.count
             _playbackState.value = PlaybackState(true, sourceId, 1, total, prepared.path)
             playJob = scope.launch {
