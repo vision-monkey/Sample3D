@@ -29,6 +29,9 @@
     const norm = (gameId, r) => ({ id: r.id || String(r.t), gameId, name: r.name, group: r.group || NO_GROUP, score: r.score, t: r.t });
     return {
       mode: 'local',
+      async startSession() {
+        return null;
+      },
       // group을 주면 해당 그룹 기록만
       async top(g, limit, group) {
         return read(g.id)
@@ -91,6 +94,34 @@
     }
     const order = (g) => `order=score.${g.higher ? 'desc' : 'asc'},created_at.asc`;
 
+    // supabase-secure.sql 의 함수 호출. 실패 시 status/code/서버 메시지를 담은 에러를 던진다.
+    async function rpc(fn, body) {
+      const res = await fetch(`${url}/rest/v1/rpc/${fn}`, {
+        method: 'POST',
+        headers: headers({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        const e = new Error((data && data.message) || 'HTTP ' + res.status);
+        e.status = res.status;
+        throw e;
+      }
+      return data;
+    }
+    const REJECT = {
+      invalid_score: '비정상적인 기록으로 판단되어 등록할 수 없습니다.',
+      bad_name: '사용할 수 없는 단어가 들어간 이름 또는 그룹명입니다.',
+      rate_limited: '등록이 너무 잦습니다. 잠시 후 다시 시도해 주세요.',
+      invalid_session: '플레이 정보가 만료되었습니다. 다시 플레이해 주세요.',
+    };
+    const friendly = (e) => {
+      if (!REJECT[e.message]) return e;
+      const f = new Error(REJECT[e.message]);
+      f.friendly = true;
+      return f;
+    };
+
     return {
       mode: 'remote',
       top(g, limit, group) {
@@ -104,9 +135,22 @@
         ]);
         return { rank: better + 1, total: all + 1 };
       },
-      async add(g, name, group, score) {
+      // 게임 시작 시 서버에 플레이 세션을 연다. 보안 SQL 적용 전 DB면 null.
+      startSession(g) {
+        return rpc('start_session', { p_game: g.id }).catch(() => null);
+      },
+      async add(g, name, group, score, session) {
         // 순위 조회가 실패해도 등록은 진행한다
         const rank = await this.rankOf(g, score).then((r) => r.rank, () => null);
+        if (session) {
+          try {
+            const row = await rpc('submit_record', { p_session: session, p_name: name, p_group: group, p_score: score });
+            return { id: String(row.id), rank };
+          } catch (e) {
+            if (e.status !== 404) throw friendly(e);
+            // 함수가 없으면(보안 SQL 적용 전) 아래 직접 등록으로 진행
+          }
+        }
         const post = (body) =>
           fetch(base, {
             method: 'POST',
@@ -116,6 +160,11 @@
         let res = await post({ game_id: g.id, name, group_name: group, score });
         // group_name 컬럼 추가(supabase.sql) 전의 DB라면 그룹 없이 등록한다
         if (res.status === 400) res = await post({ game_id: g.id, name, score });
+        if (res.status === 401 || res.status === 403) {
+          const f = new Error('보안 확인을 시작하지 못했습니다. 새로고침 후 다시 플레이해 주세요.');
+          f.friendly = true;
+          throw f;
+        }
         if (!res.ok) throw new Error('등록 실패 (' + res.status + ')');
         const [row] = await res.json();
         return { id: String(row.id), rank };
