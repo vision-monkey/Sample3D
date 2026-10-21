@@ -1,0 +1,34 @@
+name: Check work-portal (read-only)
+on:
+  push:
+    branches: [ccr-dfd948e5-vy9aup]
+    paths: [.github/workflows/check-work-portal.yml]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Supabase and Pages checks
+        run: |
+          U=https://jdsijuzddnbpambncaaz.supabase.co/rest/v1/records
+          K=sb_publishable_aetzy_5TBbXIcFNXojAaOw_0JDWiNzl
+          enc() { python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1]))' "$1"; }
+          count() { curl -sS -o /dev/null -D - -I "$U?select=id$1" -H "apikey: $K" -H "Prefer: count=exact" | tr -d '\r' | awk -F'[ /]' 'tolower($1)=="content-range:"{print $NF} /^HTTP/{s=$2} END{if(s!="200")print "HTTP "s}'; }
+          echo "== 1. group_name column select"
+          curl -sS -w "\nHTTP %{http_code}\n" "$U?select=id,game_id,name,group_name,score,created_at&order=created_at.desc&limit=5" -H "apikey: $K"
+          echo "== 2. counts"
+          echo "total:          $(count '')"
+          echo "group=무소속:   $(count "&group_name=eq.$(enc 무소속)")"
+          echo "group not 무소속: $(count "&group_name=neq.$(enc 무소속)")"
+          echo "== 3. per game"
+          for g in report risk budget approve inbox settle urgent match pipeline order; do echo "$g: $(count "&game_id=eq.$g")"; done
+          echo "== 4. distinct groups (latest 1000)"
+          curl -sS "$U?select=group_name&limit=1000" -H "apikey: $K" | python3 -c 'import sys,json,collections;print(collections.Counter(r["group_name"] for r in json.load(sys.stdin)))'
+          echo "== 5. insert permission probe (invalid row, must be rejected by check constraint, nothing saved)"
+          curl -sS -w "\nHTTP %{http_code}\n" -X POST "$U" -H "apikey: $K" -H "Content-Type: application/json" -d '{"game_id":"__probe__","name":"probe","group_name":"probe","score":1}'
+          echo "== 6. CORS expose headers"
+          curl -sS -o /dev/null -D - -X OPTIONS "$U" -H "apikey: $K" -H "Origin: https://vision-monkey.github.io" -H "Access-Control-Request-Method: GET" | grep -i "access-control" || true
+          echo "== 7. deployed site"
+          B=https://vision-monkey.github.io/Sample3D/work-portal
+          for f in index.html config.js app.js db.js; do echo "$f: $(curl -sS -o /dev/null -w '%{http_code}' $B/$f)"; done
+          curl -sS $B/config.js | grep -o "jdsijuzddnbpambncaaz" | head -1
+          curl -sS $B/app.js | grep -c "그룹 대항전"
