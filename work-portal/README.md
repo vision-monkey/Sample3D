@@ -49,6 +49,18 @@ SQL Editor에서 `supabase-secure.sql`을 한 번 실행하세요. 기존 기록
 
 브라우저 게임 특성상 조작을 100% 막을 수는 없습니다. 범위 안의 그럴듯한 가짜 점수는 여전히 가능합니다.
 
+### 방문 통계 (기존 DB)
+
+SQL Editor에서 `supabase-stats.sql`을 한 번 실행하면 방문·플레이·등록 수가 집계됩니다. 외부 통계 서비스 가입은 필요 없습니다.
+
+```sql
+select * from public.stats_daily;  -- 날짜별 방문수 · 방문자수 · 플레이 · 등록
+select * from public.stats_games;  -- 최근 30일 게임별 플레이 · 등록 · 플레이어 수
+```
+
+IP·이름은 저장하지 않고 브라우저별 임의 ID만 쓰며, 13개월 뒤 자동 삭제됩니다. 통계는 사이트에서 읽을 수 없고 대시보드에서만 볼 수 있습니다.
+개인정보처리방침은 `privacy.html`에 있습니다 (사이드바 하단 링크).
+
 ## 동료와 같이 쓰기 (GitHub Pages)
 
 저장소 **Settings → Pages** → Source: `Deploy from a branch`, 브랜치 선택, 폴더 `/ (root)` → Save.
@@ -67,3 +79,5 @@ SQL Editor에서 `supabase-secure.sql`을 한 번 실행하세요. 기존 기록
 | `supabase.sql` | 공유 순위 테이블 생성 SQL |
 | `supabase-group.sql` | 기존 DB에 그룹명 컬럼 추가 SQL |
 | `supabase-secure.sql` | 점수 검증·등록 제한·금칙어 SQL |
+| `supabase-stats.sql` | 방문 통계 SQL |
+| `privacy.html` | 개인정보처리방침 |

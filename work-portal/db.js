@@ -10,6 +10,22 @@
   const TABLE = cfg.table || 'records';
   const NO_GROUP = '무소속';
 
+  // 방문 통계용 브라우저별 임의 ID (개인 식별 정보 아님)
+  function visitorId() {
+    try {
+      let v = localStorage.getItem('wp_vid');
+      if (!v) {
+        const a = new Uint8Array(12);
+        crypto.getRandomValues(a);
+        v = 'v' + Array.from(a, (b) => (b % 36).toString(36)).join('');
+        localStorage.setItem('wp_vid', v);
+      }
+      return v;
+    } catch (e) {
+      return null;
+    }
+  }
+
   /* ---------------- 로컬 (브라우저) ---------------- */
   function localDB() {
     const k = (id) => 'wp_rec_' + id;
@@ -32,6 +48,7 @@
       async startSession() {
         return null;
       },
+      track() {},
       // group을 주면 해당 그룹 기록만
       async top(g, limit, group) {
         return read(g.id)
@@ -134,6 +151,11 @@
           count(`game_id=eq.${g.id}`),
         ]);
         return { rank: better + 1, total: all + 1 };
+      },
+      // 방문/플레이/등록 통계 (supabase-stats.sql). 실패해도 무시한다.
+      track(kind, gameId) {
+        const v = visitorId();
+        if (v) rpc('track', { p_kind: kind, p_game: gameId || null, p_visitor: v }).catch(() => {});
       },
       // 게임 시작 시 서버에 플레이 세션을 연다. 보안 SQL 적용 전 DB면 null.
       startSession(g) {

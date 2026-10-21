@@ -495,6 +495,7 @@
     area.innerHTML = '';
     let ended = false;
     const session = DB.startSession(g); // 서버 점수 검증용 플레이 세션 (Promise)
+    DB.track('play', g.id);
     const ctx = {
       paused,
       finish(score) {
@@ -578,6 +579,7 @@
       inp.value = name;
       try {
         const r = await DB.add(g, name, group, score, await session);
+        DB.track('record', g.id);
         closeModal();
         renderBoard(g, r.id);
         toast(`실적이 등록되었습니다 · ${esc(name)}${r.rank ? ` · ${r.rank}위` : ''}`);
@@ -748,4 +750,11 @@
   $('#menuBtn').addEventListener('click', () => document.body.classList.toggle('nav-open'));
   $('#scrim').addEventListener('click', () => document.body.classList.remove('nav-open'));
   route();
+  // 방문 통계: 브라우저 탭(세션)당 한 번
+  try {
+    if (!sessionStorage.getItem('wp_visit')) {
+      sessionStorage.setItem('wp_visit', '1');
+      DB.track('visit');
+    }
+  } catch (e) { /* 저장소 사용 불가 환경은 통계 생략 */ }
 })();
