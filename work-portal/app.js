@@ -100,6 +100,7 @@
       `<div class="nav-sec">메인</div>`,
       `<a href="#/" data-nav=""><span class="nav-ico">▦</span>대시보드</a>`,
       `<a href="#/ranking" data-nav="ranking"><span class="nav-ico">▲</span>실적 현황</a>`,
+      `<a href="#/groups" data-nav="groups"><span class="nav-ico">⚑</span>그룹 대항전</a>`,
       `<div class="nav-sec">업무 모듈</div>`,
       ...GAMES.map((g) => `<a href="#/game/${g.id}" data-nav="game/${g.id}"><span class="nav-code">${g.code.slice(3)}</span>${g.title}</a>`),
     ];
@@ -246,6 +247,7 @@
   }
 
   /* ---------------- 실적 현황 ---------------- */
+  let rankGroup = ''; // 실적 현황 그룹 필터 ('' = 전체)
   function renderRanking() {
     main.innerHTML = `
       <div class="page-head">
@@ -253,6 +255,10 @@
           <div class="crumb">홈 › 실적 현황</div>
           <h1>업무별 실적 현황</h1>
           <p class="sub">업무 모듈별 상위 5명의 처리 실적입니다.</p>
+        </div>
+        <div class="head-actions">
+          <label class="muted sm" for="rkGroup">그룹</label>
+          <select class="inp sel" id="rkGroup"><option value="">전체</option></select>
         </div>
       </div>
       <div class="rank-grid">${GAMES.map(
@@ -262,7 +268,117 @@
           <div class="panel-b p0" id="rk-${g.id}">${LOADING}</div>
         </section>`
       ).join('')}</div>`;
-    GAMES.forEach((g) => fill('#rk-' + g.id, DB.top(g, 5), (list) => boardHTML(g, list, 5)));
+    const sel = $('#rkGroup');
+    const load = () => GAMES.forEach((g) => fill('#rk-' + g.id, DB.top(g, 5, rankGroup), (list) => boardHTML(g, list, 5)));
+    const seq = viewSeq;
+    DB.all(GAMES)
+      .then((rows) => {
+        if (seq !== viewSeq) return;
+        const groups = [...new Set([getGroup(), rankGroup, ...rows.map((r) => r.group)].filter(Boolean))].sort((a, b) =>
+          a === NO_GROUP ? 1 : b === NO_GROUP ? -1 : a.localeCompare(b, 'ko')
+        );
+        sel.innerHTML = '<option value="">전체</option>' + groups.map((gr) => `<option value="${esc(gr)}">${esc(gr)}${gr === getGroup() ? ' (내 그룹)' : ''}</option>`).join('');
+        sel.value = rankGroup;
+      })
+      .catch(() => {});
+    sel.addEventListener('change', () => {
+      rankGroup = sel.value;
+      load();
+    });
+    load();
+  }
+
+  /* ---------------- 그룹 대항전 ---------------- */
+  const POINTS = [10, 7, 5, 3, 2, 1]; // 업무별 그룹 순위 점수 (1~6위)
+  function groupStandings(rows) {
+    const total = new Map();
+    const perGame = {};
+    const entry = (gr) => {
+      if (!total.has(gr)) total.set(gr, { group: gr, points: 0, wins: 0, members: new Set(), count: 0 });
+      return total.get(gr);
+    };
+    for (const r of rows) {
+      if (r.group === NO_GROUP || !byId[r.gameId]) continue;
+      const e = entry(r.group);
+      e.members.add(r.name);
+      e.count++;
+    }
+    for (const g of GAMES) {
+      const best = new Map(); // group -> 최고 기록
+      for (const r of rows) {
+        if (r.gameId !== g.id || r.group === NO_GROUP) continue;
+        const b = best.get(r.group);
+        if (!b || (g.higher ? r.score > b.score : r.score < b.score) || (r.score === b.score && r.t < b.t)) best.set(r.group, r);
+      }
+      const ranked = [...best.values()].sort((a, b) => (g.higher ? b.score - a.score : a.score - b.score) || a.t - b.t);
+      ranked.forEach((r, i) => {
+        const e = entry(r.group);
+        e.points += POINTS[i] || 0;
+        if (i === 0) e.wins++;
+      });
+      perGame[g.id] = ranked;
+    }
+    const list = [...total.values()].sort((a, b) => b.points - a.points || b.wins - a.wins || b.count - a.count);
+    return { list, perGame };
+  }
+
+  function renderGroups() {
+    const mine = getGroup();
+    main.innerHTML = `
+      <div class="page-head">
+        <div>
+          <div class="crumb">홈 › 그룹 대항전</div>
+          <h1>그룹 대항전</h1>
+          <p class="sub">업무별 그룹 최고 기록 순위로 점수를 매깁니다 (1위 ${POINTS.join(' · ')}점 …). 무소속은 제외됩니다.</p>
+        </div>
+        <div class="head-actions">
+          <span class="badge gray">내 그룹: ${esc(mine)}</span>
+          <button class="btn" id="btnGroup">그룹 설정</button>
+        </div>
+      </div>
+      <section class="panel">
+        <div class="panel-h"><span>종합 순위</span></div>
+        <div class="panel-b p0 scroll-x" id="grTotal">${LOADING}</div>
+      </section>
+      <div class="rank-grid mt">${GAMES.map(
+        (g) => `
+        <section class="panel">
+          <div class="panel-h"><span><span class="badge">${g.code}</span> ${g.title}</span><a class="muted sm" href="#/game/${g.id}">상세 ›</a></div>
+          <div class="panel-b p0" id="gr-${g.id}">${LOADING}</div>
+        </section>`
+      ).join('')}</div>`;
+    $('#btnGroup').addEventListener('click', openNameModal);
+    const seq = viewSeq;
+    const empty = '<div class="empty">그룹 기록이 없습니다.<br><span class="sm">사용자 설정에서 그룹명을 정하고 실적을 등록해 보세요.</span></div>';
+    DB.all(GAMES).then(
+      (rows) => {
+        if (seq !== viewSeq) return;
+        const { list, perGame } = groupStandings(rows);
+        $('#grTotal').innerHTML = list.length
+          ? `<table class="tbl rank-tbl"><thead><tr><th>순위</th><th>그룹</th><th class="r">총점</th><th class="r">1위 업무</th><th class="r hide-sm">참여 인원</th><th class="r hide-sm">등록 건수</th></tr></thead><tbody>${list
+              .map(
+                (e, i) => `<tr class="${e.group === mine ? 'me' : ''}"><td><span class="rk rk${i + 1}">${i + 1}</span></td><td class="wrap">${esc(e.group)}</td><td class="r b">${e.points}점</td><td class="r">${e.wins}개</td><td class="r hide-sm">${e.members.size}명</td><td class="r hide-sm">${e.count}건</td></tr>`
+              )
+              .join('')}</tbody></table>`
+          : empty;
+        GAMES.forEach((g) => {
+          const ranked = perGame[g.id];
+          $('#gr-' + g.id).innerHTML = ranked.length
+            ? `<table class="tbl rank-tbl"><thead><tr><th>순위</th><th>그룹</th><th>대표 선수</th><th class="r">최고 실적</th></tr></thead><tbody>${ranked
+                .slice(0, 5)
+                .map(
+                  (r, i) => `<tr class="${r.group === mine ? 'me' : ''}"><td><span class="rk rk${i + 1}">${i + 1}</span></td><td class="wrap">${esc(r.group)}</td><td class="wrap">${esc(r.name)}</td><td class="r b">${g.fmt(r.score)}</td></tr>`
+                )
+                .join('')}</tbody></table>`
+            : '<div class="empty">그룹 기록이 없습니다.</div>';
+        });
+      },
+      (e) => {
+        if (seq !== viewSeq) return;
+        $('#grTotal').innerHTML = errHTML(e);
+        GAMES.forEach((g) => ($('#gr-' + g.id).innerHTML = '<div class="empty">-</div>'));
+      }
+    );
   }
 
   /* ---------------- 게임 화면 ---------------- */
@@ -288,7 +404,9 @@
           <div class="panel-b game-area" id="gArea"></div>
         </section>
         <aside class="panel">
-          <div class="panel-h"><span>실적 순위 TOP 10</span></div>
+          <div class="panel-h"><span>실적 순위 TOP 10</span>
+            <span class="seg" id="gScope"><button data-s="all">전체</button><button data-s="mine">내 그룹</button></span>
+          </div>
           <div class="panel-b p0" id="gBoard">${LOADING}</div>
         </aside>
       </div>`;
@@ -296,12 +414,27 @@
       stopGame();
       renderIntro(g);
     });
+    $('#gScope').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-s]');
+      if (!b) return;
+      boardScope = b.dataset.s;
+      renderBoard(g);
+    });
     renderIntro(g);
     renderBoard(g);
   }
 
+  let boardScope = 'all'; // 게임 화면 순위표 범위: 전체 / 내 그룹
   function renderBoard(g, highlightId) {
-    fill('#gBoard', DB.top(g, 10), (list) => boardHTML(g, list, 10, highlightId));
+    const scope = $('#gScope');
+    if (scope) {
+      scope.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.s === boardScope));
+      scope.querySelector('[data-s="mine"]').textContent = '내 그룹 (' + getGroup() + ')';
+    }
+    const group = boardScope === 'mine' ? getGroup() : '';
+    fill('#gBoard', DB.top(g, 10, group), (list) =>
+      list.length || !group ? boardHTML(g, list, 10, highlightId) : `<div class="empty">${esc(group)} 그룹의 실적이 없습니다.</div>`
+    );
   }
 
   function setStatus(text, cls) {
@@ -470,7 +603,10 @@
       </div>
       <div class="modal-f"><button class="btn" id="mCancel">취소</button><button class="btn primary" id="mSave">저장</button></div>`,
       () => {
-        if (!location.hash || location.hash === '#/') renderDashboard();
+        const h = location.hash;
+        if (!h || h === '#/') renderDashboard();
+        else if (h === '#/groups') renderGroups();
+        else if (h.startsWith('#/game/') && byId[h.slice(7)] && !current) renderBoard(byId[h.slice(7)]);
       }
     );
     const inp = $('#nmInput');
@@ -554,6 +690,9 @@
     } else if (view === 'ranking') {
       setActiveNav('ranking');
       renderRanking();
+    } else if (view === 'groups') {
+      setActiveNav('groups');
+      renderGroups();
     } else {
       setActiveNav('');
       renderDashboard();

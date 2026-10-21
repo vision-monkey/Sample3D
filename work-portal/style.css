@@ -446,3 +446,12 @@ button { font: inherit; color: inherit; }
 }
 .grp.none { background: #eef0f4; color: #7a8599; }
 .inp.full { width: 100%; }
+.sel { height: 30px; padding: 0 8px; min-width: 140px; }
+.mt { margin-top: 16px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.seg button {
+  border: 0; background: #fff; font-size: 11px; padding: 3px 9px; cursor: pointer; color: var(--muted);
+  max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: var(--accent-2); color: var(--accent); font-weight: 600; }

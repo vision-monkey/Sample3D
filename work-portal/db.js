@@ -29,8 +29,13 @@
     const norm = (gameId, r) => ({ id: r.id || String(r.t), gameId, name: r.name, group: r.group || NO_GROUP, score: r.score, t: r.t });
     return {
       mode: 'local',
-      async top(g, limit) {
-        return read(g.id).sort(cmp(g)).slice(0, limit).map((r) => norm(g.id, r));
+      // group을 주면 해당 그룹 기록만
+      async top(g, limit, group) {
+        return read(g.id)
+          .map((r) => norm(g.id, r))
+          .filter((r) => !group || r.group === group)
+          .sort(cmp(g))
+          .slice(0, limit);
       },
       async rankOf(g, score) {
         const list = read(g.id);
@@ -54,6 +59,10 @@
       },
       async total(games) {
         return games.reduce((s, g) => s + read(g.id).length, 0);
+      },
+      // 그룹 집계용 전체 기록
+      async all(games) {
+        return games.flatMap((g) => read(g.id).map((r) => norm(g.id, r)));
       },
     };
   }
@@ -84,8 +93,9 @@
 
     return {
       mode: 'remote',
-      top(g, limit) {
-        return get(`select=*&game_id=eq.${g.id}&${order(g)}&limit=${limit}`);
+      top(g, limit, group) {
+        const gq = group ? `&group_name=eq.${encodeURIComponent(group)}` : '';
+        return get(`select=*&game_id=eq.${g.id}${gq}&${order(g)}&limit=${limit}`);
       },
       async rankOf(g, score) {
         const [better, all] = await Promise.all([
@@ -115,6 +125,10 @@
       },
       total() {
         return count('');
+      },
+      // 그룹 집계용: 최근 기록 최대 5,000건
+      all() {
+        return get('select=*&order=created_at.desc&limit=5000');
       },
     };
   }
