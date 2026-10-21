@@ -49,6 +49,20 @@
     renderUser();
   }
   const cleanGroup = (v) => v.trim().slice(0, 20) || NO_GROUP;
+
+  // 금칙어 (서버 supabase-secure.sql 의 wp_has_bad_word 와 같은 목록)
+  const BAD_WORDS = [
+    '시발', '씨발', '씨팔', '시팔', '쉬발', 'ㅅㅂ', 'ㅆㅂ', '병신', '븅신', 'ㅂㅅ', '좆', '존나', '졸라', '지랄', 'ㅈㄹ',
+    '개새', '새끼', '섀끼', '미친놈', '미친년', '염병', '엠창', '느금', '니애미', '니미럴', '애미', '애비', '썅', '쌍놈', '쌍년',
+    '꺼져', '닥쳐', '보지', '자지', '섹스', 'sex', 'fuck', 'shit', 'bitch', 'nigger',
+  ];
+  const hasBadWord = (t) => {
+    const s = String(t).toLowerCase().replace(/[\s\p{P}\p{S}\d]/gu, '');
+    return BAD_WORDS.some((w) => s.includes(w));
+  };
+  // 이름/그룹 입력값 검사. 문제 있으면 오류 문구, 없으면 ''
+  const profileError = (name, group) =>
+    hasBadWord(name) || hasBadWord(group) ? '사용할 수 없는 단어가 들어 있습니다. 다른 이름이나 그룹명을 입력해 주세요.' : '';
   const groupTag = (gr) => `<span class="grp${gr === NO_GROUP ? ' none' : ''}">${esc(gr)}</span>`;
 
   // 담당자명 + 그룹명 입력 칸 (설정 창, 실적 등록 창 공용)
@@ -480,6 +494,8 @@
     const area = $('#gArea');
     area.innerHTML = '';
     let ended = false;
+    const session = DB.startSession(g); // 서버 점수 검증용 플레이 세션 (Promise)
+    DB.track('play', g.id);
     const ctx = {
       paused,
       finish(score) {
@@ -487,7 +503,7 @@
         ended = true;
         stopGame();
         setStatus('완료', 'done');
-        showResult(g, score);
+        showResult(g, score, session);
       },
       fail(msg) {
         if (ended) return;
@@ -517,7 +533,7 @@
     if (cb) cb();
   }
 
-  function showResult(g, score) {
+  function showResult(g, score, session) {
     openModal(
       `<div class="modal-h">업무 처리 완료 보고</div>
       <div class="modal-b">
@@ -545,17 +561,25 @@
     let saving = false;
     const save = async () => {
       if (saving) return;
+      const err = $('#mErr');
+      const name = inp.value.trim().slice(0, 16) || randomName();
+      const group = cleanGroup($('#grInput').value);
+      const bad = profileError(name, group);
+      if (bad) {
+        err.textContent = bad;
+        err.classList.remove('hidden');
+        return;
+      }
       saving = true;
       const btn = $('#mSave');
       btn.disabled = $('#mSkip').disabled = true;
       btn.textContent = '등록 중…';
-      const name = inp.value.trim().slice(0, 16) || randomName();
-      const group = cleanGroup($('#grInput').value);
       setName(name);
       setGroup(group);
       inp.value = name;
       try {
-        const r = await DB.add(g, name, group, score);
+        const r = await DB.add(g, name, group, score, await session);
+        DB.track('record', g.id);
         closeModal();
         renderBoard(g, r.id);
         toast(`실적이 등록되었습니다 · ${esc(name)}${r.rank ? ` · ${r.rank}위` : ''}`);
@@ -563,8 +587,7 @@
         saving = false;
         btn.disabled = $('#mSkip').disabled = false;
         btn.textContent = '다시 등록';
-        const err = $('#mErr');
-        err.textContent = '실적 등록에 실패했습니다. 잠시 후 다시 시도해 주세요. (' + e.message + ')';
+        err.textContent = e.friendly ? e.message : '실적 등록에 실패했습니다. 잠시 후 다시 시도해 주세요. (' + e.message + ')';
         err.classList.remove('hidden');
       }
     };
@@ -599,6 +622,7 @@
       `<div class="modal-h">사용자 설정</div>
       <div class="modal-b">
         ${profileFields()}
+        <p class="form-err hidden" id="mErr"></p>
         <p class="muted sm">실적 등록 시 이 이름과 그룹이 기본으로 사용됩니다.</p>
       </div>
       <div class="modal-f"><button class="btn" id="mCancel">취소</button><button class="btn primary" id="mSave">저장</button></div>`,
@@ -615,6 +639,12 @@
     const save = () => {
       const name = inp.value.trim().slice(0, 16) || randomName();
       const group = cleanGroup($('#grInput').value);
+      const bad = profileError(name, group);
+      if (bad) {
+        $('#mErr').textContent = bad;
+        $('#mErr').classList.remove('hidden');
+        return;
+      }
       setName(name);
       setGroup(group);
       closeModal();
@@ -639,7 +669,7 @@
   }
 
   /* ---------------- 보스 화면 (ESC) ---------------- */
-  const BOSS_TITLE = '2026_4Q_매출실적_최종_v3(진짜최종).xlsx - Excel';
+  const BOSS_TITLE = '2026_4Q_매출실적_최종_v3(진짜최종).xlsx - 스프레드시트';
   const APP_TITLE = document.title;
   function buildBoss() {
     const regions = ['서울', '경기', '인천', '부산', '대구', '광주', '대전', '울산', '세종', '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주'];
@@ -659,7 +689,7 @@
     rows.push(['합계', '', '', '', '', sum.toLocaleString(), '', '', '', '']);
     while (rows.length < 32) rows.push(Array(10).fill(''));
     $('#boss').innerHTML = `
-      <div class="xl-top"><span class="xl-logo">X</span><span class="xl-name">${BOSS_TITLE}</span><span class="xl-saved">저장됨 ✓</span></div>
+      <div class="xl-top"><span class="xl-logo">▦</span><span class="xl-name">${BOSS_TITLE}</span><span class="xl-saved">저장됨 ✓</span></div>
       <div class="xl-menu">${['파일', '홈', '삽입', '페이지 레이아웃', '수식', '데이터', '검토', '보기', '도움말'].map((m, i) => `<span class="${i === 1 ? 'on' : ''}">${m}</span>`).join('')}</div>
       <div class="xl-ribbon"><span>붙여넣기</span><span>맑은 고딕 ▾</span><span>11 ▾</span><b>가</b><i>가</i><u>가</u><span>│</span><span>≡ 가운데 맞춤</span><span>%</span><span>,</span><span>│</span><span>조건부 서식 ▾</span><span>표 서식 ▾</span><span>Σ 자동 합계 ▾</span></div>
       <div class="xl-fx"><span class="xl-cell">F19</span><span class="xl-fxi">fx</span><span>=SUM(F2:F18)</span></div>
@@ -720,4 +750,11 @@
   $('#menuBtn').addEventListener('click', () => document.body.classList.toggle('nav-open'));
   $('#scrim').addEventListener('click', () => document.body.classList.remove('nav-open'));
   route();
+  // 방문 통계: 브라우저 탭(세션)당 한 번
+  try {
+    if (!sessionStorage.getItem('wp_visit')) {
+      sessionStorage.setItem('wp_visit', '1');
+      DB.track('visit');
+    }
+  } catch (e) { /* 저장소 사용 불가 환경은 통계 생략 */ }
 })();
