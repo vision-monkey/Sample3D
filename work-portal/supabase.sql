@@ -35,3 +35,13 @@ create policy "anyone can add a record"
   with check (true);
 
 grant select, insert on public.records to anon, authenticated;
+
+-- 그룹명 (supabase-group.sql과 동일, 새로 설치할 때도 함께 적용)
+alter table public.records
+  add column if not exists group_name text not null default '무소속';
+
+alter table public.records drop constraint if exists records_group_chk;
+alter table public.records
+  add constraint records_group_chk check (char_length(btrim(group_name)) between 1 and 20);
+
+create index if not exists records_group_idx on public.records (group_name);

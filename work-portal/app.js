@@ -37,11 +37,29 @@
   const GAMES = window.WP_GAMES;
   const byId = Object.fromEntries(GAMES.map((g) => [g.id, g]));
 
+  const NO_GROUP = '무소속';
   const getName = () => store.get('wp_name', '');
   function setName(n) {
     store.set('wp_name', n);
     renderUser();
   }
+  const getGroup = () => store.get('wp_group', '') || NO_GROUP;
+  function setGroup(gr) {
+    store.set('wp_group', gr === NO_GROUP ? '' : gr);
+    renderUser();
+  }
+  const cleanGroup = (v) => v.trim().slice(0, 20) || NO_GROUP;
+  const groupTag = (gr) => `<span class="grp${gr === NO_GROUP ? ' none' : ''}">${esc(gr)}</span>`;
+
+  // 담당자명 + 그룹명 입력 칸 (설정 창, 실적 등록 창 공용)
+  const profileFields = () => `
+        <label class="lbl" for="nmInput">담당자명 <span class="muted">(선택 · 미입력 시 랜덤 아이디)</span></label>
+        <div class="row">
+          <input class="inp" id="nmInput" maxlength="16" autocomplete="off" placeholder="예) ${esc(randomName())}" value="${esc(getName())}" />
+          <button class="btn" id="nmRand" title="랜덤 아이디">🎲 랜덤</button>
+        </div>
+        <label class="lbl" for="grInput">그룹명 <span class="muted">(선택 · 미입력 시 무소속)</span></label>
+        <input class="inp full" id="grInput" maxlength="20" autocomplete="off" placeholder="예) 개발1팀, 3층 탕비실파" value="${esc(getGroup() === NO_GROUP ? '' : getGroup())}" />`;
 
   const DB = window.WP_DB;
 
@@ -82,6 +100,7 @@
       `<div class="nav-sec">메인</div>`,
       `<a href="#/" data-nav=""><span class="nav-ico">▦</span>대시보드</a>`,
       `<a href="#/ranking" data-nav="ranking"><span class="nav-ico">▲</span>실적 현황</a>`,
+      `<a href="#/groups" data-nav="groups"><span class="nav-ico">⚑</span>그룹 대항전</a>`,
       `<div class="nav-sec">업무 모듈</div>`,
       ...GAMES.map((g) => `<a href="#/game/${g.id}" data-nav="game/${g.id}"><span class="nav-code">${g.code.slice(3)}</span>${g.title}</a>`),
     ];
@@ -93,6 +112,7 @@
   function renderUser() {
     const n = getName();
     $('#userName').textContent = n || '게스트';
+    $('#userGroup').textContent = getGroup();
     $('#avatar').textContent = n ? n.trim().split(' ').pop()[0] : '?';
   }
   function tickClock() {
@@ -121,7 +141,7 @@
       .slice(0, limit)
       .map((r, i) => {
         const cls = [r.id === highlightId ? 'hl' : '', me && r.name === me ? 'me' : ''].join(' ');
-        return `<tr class="${cls}"><td><span class="rk rk${i + 1}">${i + 1}</span></td><td>${esc(r.name)}</td><td class="r b">${g.fmt(r.score)}</td><td class="r muted hide-sm">${fmtDate(r.t)}</td></tr>`;
+        return `<tr class="${cls}"><td><span class="rk rk${i + 1}">${i + 1}</span></td><td class="wrap">${esc(r.name)} ${groupTag(r.group)}</td><td class="r b">${g.fmt(r.score)}</td><td class="r muted hide-sm">${fmtDate(r.t)}</td></tr>`;
       })
       .join('')}</tbody></table>`;
   }
@@ -138,7 +158,7 @@
           <p class="sub">${me ? esc(me) + '님, ' : ''}오늘도 성실한 업무 처리 부탁드립니다.</p>
         </div>
         <div class="head-actions">
-          <button class="btn" id="btnName">담당자 설정</button>
+          <button class="btn" id="btnName">사용자 설정</button>
           <a class="btn primary" href="#/game/${GAMES[Math.floor(Math.random() * GAMES.length)].id}">+ 신규 업무 처리</a>
         </div>
       </div>
@@ -219,7 +239,7 @@
             .filter((r) => byId[r.gameId])
             .map((r) => {
               const g = byId[r.gameId];
-              return `<tr><td><span class="badge gray">${g.code}</span></td><td class="wrap">${esc(r.name)}</td><td class="r b">${g.fmt(r.score)}</td><td class="r muted">${fmtDate(r.t)}</td></tr>`;
+              return `<tr><td><span class="badge gray">${g.code}</span></td><td class="wrap">${esc(r.name)} ${groupTag(r.group)}</td><td class="r b">${g.fmt(r.score)}</td><td class="r muted">${fmtDate(r.t)}</td></tr>`;
             })
             .join('')}</tbody></table>`
         : '<div class="empty">아직 등록된 실적이 없습니다.</div>'
@@ -227,6 +247,7 @@
   }
 
   /* ---------------- 실적 현황 ---------------- */
+  let rankGroup = ''; // 실적 현황 그룹 필터 ('' = 전체)
   function renderRanking() {
     main.innerHTML = `
       <div class="page-head">
@@ -234,6 +255,10 @@
           <div class="crumb">홈 › 실적 현황</div>
           <h1>업무별 실적 현황</h1>
           <p class="sub">업무 모듈별 상위 5명의 처리 실적입니다.</p>
+        </div>
+        <div class="head-actions">
+          <label class="muted sm" for="rkGroup">그룹</label>
+          <select class="inp sel" id="rkGroup"><option value="">전체</option></select>
         </div>
       </div>
       <div class="rank-grid">${GAMES.map(
@@ -243,7 +268,117 @@
           <div class="panel-b p0" id="rk-${g.id}">${LOADING}</div>
         </section>`
       ).join('')}</div>`;
-    GAMES.forEach((g) => fill('#rk-' + g.id, DB.top(g, 5), (list) => boardHTML(g, list, 5)));
+    const sel = $('#rkGroup');
+    const load = () => GAMES.forEach((g) => fill('#rk-' + g.id, DB.top(g, 5, rankGroup), (list) => boardHTML(g, list, 5)));
+    const seq = viewSeq;
+    DB.all(GAMES)
+      .then((rows) => {
+        if (seq !== viewSeq) return;
+        const groups = [...new Set([getGroup(), rankGroup, ...rows.map((r) => r.group)].filter(Boolean))].sort((a, b) =>
+          a === NO_GROUP ? 1 : b === NO_GROUP ? -1 : a.localeCompare(b, 'ko')
+        );
+        sel.innerHTML = '<option value="">전체</option>' + groups.map((gr) => `<option value="${esc(gr)}">${esc(gr)}${gr === getGroup() ? ' (내 그룹)' : ''}</option>`).join('');
+        sel.value = rankGroup;
+      })
+      .catch(() => {});
+    sel.addEventListener('change', () => {
+      rankGroup = sel.value;
+      load();
+    });
+    load();
+  }
+
+  /* ---------------- 그룹 대항전 ---------------- */
+  const POINTS = [10, 7, 5, 3, 2, 1]; // 업무별 그룹 순위 점수 (1~6위)
+  function groupStandings(rows) {
+    const total = new Map();
+    const perGame = {};
+    const entry = (gr) => {
+      if (!total.has(gr)) total.set(gr, { group: gr, points: 0, wins: 0, members: new Set(), count: 0 });
+      return total.get(gr);
+    };
+    for (const r of rows) {
+      if (r.group === NO_GROUP || !byId[r.gameId]) continue;
+      const e = entry(r.group);
+      e.members.add(r.name);
+      e.count++;
+    }
+    for (const g of GAMES) {
+      const best = new Map(); // group -> 최고 기록
+      for (const r of rows) {
+        if (r.gameId !== g.id || r.group === NO_GROUP) continue;
+        const b = best.get(r.group);
+        if (!b || (g.higher ? r.score > b.score : r.score < b.score) || (r.score === b.score && r.t < b.t)) best.set(r.group, r);
+      }
+      const ranked = [...best.values()].sort((a, b) => (g.higher ? b.score - a.score : a.score - b.score) || a.t - b.t);
+      ranked.forEach((r, i) => {
+        const e = entry(r.group);
+        e.points += POINTS[i] || 0;
+        if (i === 0) e.wins++;
+      });
+      perGame[g.id] = ranked;
+    }
+    const list = [...total.values()].sort((a, b) => b.points - a.points || b.wins - a.wins || b.count - a.count);
+    return { list, perGame };
+  }
+
+  function renderGroups() {
+    const mine = getGroup();
+    main.innerHTML = `
+      <div class="page-head">
+        <div>
+          <div class="crumb">홈 › 그룹 대항전</div>
+          <h1>그룹 대항전</h1>
+          <p class="sub">업무별 그룹 최고 기록 순위로 점수를 매깁니다 (1위 ${POINTS.join(' · ')}점 …). 무소속은 제외됩니다.</p>
+        </div>
+        <div class="head-actions">
+          <span class="badge gray">내 그룹: ${esc(mine)}</span>
+          <button class="btn" id="btnGroup">그룹 설정</button>
+        </div>
+      </div>
+      <section class="panel">
+        <div class="panel-h"><span>종합 순위</span></div>
+        <div class="panel-b p0 scroll-x" id="grTotal">${LOADING}</div>
+      </section>
+      <div class="rank-grid mt">${GAMES.map(
+        (g) => `
+        <section class="panel">
+          <div class="panel-h"><span><span class="badge">${g.code}</span> ${g.title}</span><a class="muted sm" href="#/game/${g.id}">상세 ›</a></div>
+          <div class="panel-b p0" id="gr-${g.id}">${LOADING}</div>
+        </section>`
+      ).join('')}</div>`;
+    $('#btnGroup').addEventListener('click', openNameModal);
+    const seq = viewSeq;
+    const empty = '<div class="empty">그룹 기록이 없습니다.<br><span class="sm">사용자 설정에서 그룹명을 정하고 실적을 등록해 보세요.</span></div>';
+    DB.all(GAMES).then(
+      (rows) => {
+        if (seq !== viewSeq) return;
+        const { list, perGame } = groupStandings(rows);
+        $('#grTotal').innerHTML = list.length
+          ? `<table class="tbl rank-tbl"><thead><tr><th>순위</th><th>그룹</th><th class="r">총점</th><th class="r">1위 업무</th><th class="r hide-sm">참여 인원</th><th class="r hide-sm">등록 건수</th></tr></thead><tbody>${list
+              .map(
+                (e, i) => `<tr class="${e.group === mine ? 'me' : ''}"><td><span class="rk rk${i + 1}">${i + 1}</span></td><td class="wrap">${esc(e.group)}</td><td class="r b">${e.points}점</td><td class="r">${e.wins}개</td><td class="r hide-sm">${e.members.size}명</td><td class="r hide-sm">${e.count}건</td></tr>`
+              )
+              .join('')}</tbody></table>`
+          : empty;
+        GAMES.forEach((g) => {
+          const ranked = perGame[g.id];
+          $('#gr-' + g.id).innerHTML = ranked.length
+            ? `<table class="tbl rank-tbl"><thead><tr><th>순위</th><th>그룹</th><th>대표 선수</th><th class="r">최고 실적</th></tr></thead><tbody>${ranked
+                .slice(0, 5)
+                .map(
+                  (r, i) => `<tr class="${r.group === mine ? 'me' : ''}"><td><span class="rk rk${i + 1}">${i + 1}</span></td><td class="wrap">${esc(r.group)}</td><td class="wrap">${esc(r.name)}</td><td class="r b">${g.fmt(r.score)}</td></tr>`
+                )
+                .join('')}</tbody></table>`
+            : '<div class="empty">그룹 기록이 없습니다.</div>';
+        });
+      },
+      (e) => {
+        if (seq !== viewSeq) return;
+        $('#grTotal').innerHTML = errHTML(e);
+        GAMES.forEach((g) => ($('#gr-' + g.id).innerHTML = '<div class="empty">-</div>'));
+      }
+    );
   }
 
   /* ---------------- 게임 화면 ---------------- */
@@ -269,7 +404,9 @@
           <div class="panel-b game-area" id="gArea"></div>
         </section>
         <aside class="panel">
-          <div class="panel-h"><span>실적 순위 TOP 10</span></div>
+          <div class="panel-h"><span>실적 순위 TOP 10</span>
+            <span class="seg" id="gScope"><button data-s="all">전체</button><button data-s="mine">내 그룹</button></span>
+          </div>
           <div class="panel-b p0" id="gBoard">${LOADING}</div>
         </aside>
       </div>`;
@@ -277,12 +414,27 @@
       stopGame();
       renderIntro(g);
     });
+    $('#gScope').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-s]');
+      if (!b) return;
+      boardScope = b.dataset.s;
+      renderBoard(g);
+    });
     renderIntro(g);
     renderBoard(g);
   }
 
+  let boardScope = 'all'; // 게임 화면 순위표 범위: 전체 / 내 그룹
   function renderBoard(g, highlightId) {
-    fill('#gBoard', DB.top(g, 10), (list) => boardHTML(g, list, 10, highlightId));
+    const scope = $('#gScope');
+    if (scope) {
+      scope.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.s === boardScope));
+      scope.querySelector('[data-s="mine"]').textContent = '내 그룹 (' + getGroup() + ')';
+    }
+    const group = boardScope === 'mine' ? getGroup() : '';
+    fill('#gBoard', DB.top(g, 10, group), (list) =>
+      list.length || !group ? boardHTML(g, list, 10, highlightId) : `<div class="empty">${esc(group)} 그룹의 실적이 없습니다.</div>`
+    );
   }
 
   function setStatus(text, cls) {
@@ -374,11 +526,7 @@
           <tr><th>처리 실적</th><td class="result">${g.fmt(score)}</td></tr>
           <tr><th>예상 순위</th><td id="mRank"><span class="muted">조회 중…</span></td></tr>
         </table>
-        <label class="lbl" for="nmInput">담당자명 <span class="muted">(선택 · 미입력 시 랜덤 아이디)</span></label>
-        <div class="row">
-          <input class="inp" id="nmInput" maxlength="16" autocomplete="off" placeholder="예) ${esc(randomName())}" value="${esc(getName())}" />
-          <button class="btn" id="nmRand" title="랜덤 아이디">🎲 랜덤</button>
-        </div>
+        ${profileFields()}
         <p class="form-err hidden" id="mErr"></p>
       </div>
       <div class="modal-f">
@@ -402,10 +550,12 @@
       btn.disabled = $('#mSkip').disabled = true;
       btn.textContent = '등록 중…';
       const name = inp.value.trim().slice(0, 16) || randomName();
+      const group = cleanGroup($('#grInput').value);
       setName(name);
+      setGroup(group);
       inp.value = name;
       try {
-        const r = await DB.add(g, name, score);
+        const r = await DB.add(g, name, group, score);
         closeModal();
         renderBoard(g, r.id);
         toast(`실적이 등록되었습니다 · ${esc(name)}${r.rank ? ` · ${r.rank}위` : ''}`);
@@ -419,9 +569,11 @@
       }
     };
     $('#mSave').addEventListener('click', save);
-    inp.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.isComposing) save();
-    });
+    [inp, $('#grInput')].forEach((el) =>
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.isComposing) save();
+      })
+    );
     setTimeout(() => $('#mSave').focus(), 0);
   }
 
@@ -444,18 +596,17 @@
 
   function openNameModal() {
     openModal(
-      `<div class="modal-h">담당자 설정</div>
+      `<div class="modal-h">사용자 설정</div>
       <div class="modal-b">
-        <label class="lbl" for="nmInput">담당자명 <span class="muted">(선택 · 미입력 시 랜덤 아이디)</span></label>
-        <div class="row">
-          <input class="inp" id="nmInput" maxlength="16" autocomplete="off" placeholder="예) ${esc(randomName())}" value="${esc(getName())}" />
-          <button class="btn" id="nmRand">🎲 랜덤</button>
-        </div>
-        <p class="muted sm">실적 등록 시 이 이름이 기본으로 사용됩니다.</p>
+        ${profileFields()}
+        <p class="muted sm">실적 등록 시 이 이름과 그룹이 기본으로 사용됩니다.</p>
       </div>
       <div class="modal-f"><button class="btn" id="mCancel">취소</button><button class="btn primary" id="mSave">저장</button></div>`,
       () => {
-        if (!location.hash || location.hash === '#/') renderDashboard();
+        const h = location.hash;
+        if (!h || h === '#/') renderDashboard();
+        else if (h === '#/groups') renderGroups();
+        else if (h.startsWith('#/game/') && byId[h.slice(7)] && !current) renderBoard(byId[h.slice(7)]);
       }
     );
     const inp = $('#nmInput');
@@ -463,14 +614,18 @@
     $('#mCancel').addEventListener('click', closeModal);
     const save = () => {
       const name = inp.value.trim().slice(0, 16) || randomName();
+      const group = cleanGroup($('#grInput').value);
       setName(name);
+      setGroup(group);
       closeModal();
-      toast('담당자가 ' + esc(name) + '(으)로 설정되었습니다');
+      toast(`${esc(name)} (${esc(group)})(으)로 설정되었습니다`);
     };
     $('#mSave').addEventListener('click', save);
-    inp.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.isComposing) save();
-    });
+    [inp, $('#grInput')].forEach((el) =>
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.isComposing) save();
+      })
+    );
     setTimeout(() => inp.focus(), 0);
   }
 
@@ -535,6 +690,9 @@
     } else if (view === 'ranking') {
       setActiveNav('ranking');
       renderRanking();
+    } else if (view === 'groups') {
+      setActiveNav('groups');
+      renderGroups();
     } else {
       setActiveNav('');
       renderDashboard();
