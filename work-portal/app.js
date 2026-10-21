@@ -37,11 +37,29 @@
   const GAMES = window.WP_GAMES;
   const byId = Object.fromEntries(GAMES.map((g) => [g.id, g]));
 
+  const NO_GROUP = '무소속';
   const getName = () => store.get('wp_name', '');
   function setName(n) {
     store.set('wp_name', n);
     renderUser();
   }
+  const getGroup = () => store.get('wp_group', '') || NO_GROUP;
+  function setGroup(gr) {
+    store.set('wp_group', gr === NO_GROUP ? '' : gr);
+    renderUser();
+  }
+  const cleanGroup = (v) => v.trim().slice(0, 20) || NO_GROUP;
+  const groupTag = (gr) => `<span class="grp${gr === NO_GROUP ? ' none' : ''}">${esc(gr)}</span>`;
+
+  // 담당자명 + 그룹명 입력 칸 (설정 창, 실적 등록 창 공용)
+  const profileFields = () => `
+        <label class="lbl" for="nmInput">담당자명 <span class="muted">(선택 · 미입력 시 랜덤 아이디)</span></label>
+        <div class="row">
+          <input class="inp" id="nmInput" maxlength="16" autocomplete="off" placeholder="예) ${esc(randomName())}" value="${esc(getName())}" />
+          <button class="btn" id="nmRand" title="랜덤 아이디">🎲 랜덤</button>
+        </div>
+        <label class="lbl" for="grInput">그룹명 <span class="muted">(선택 · 미입력 시 무소속)</span></label>
+        <input class="inp full" id="grInput" maxlength="20" autocomplete="off" placeholder="예) 개발1팀, 3층 탕비실파" value="${esc(getGroup() === NO_GROUP ? '' : getGroup())}" />`;
 
   const DB = window.WP_DB;
 
@@ -93,6 +111,7 @@
   function renderUser() {
     const n = getName();
     $('#userName').textContent = n || '게스트';
+    $('#userGroup').textContent = getGroup();
     $('#avatar').textContent = n ? n.trim().split(' ').pop()[0] : '?';
   }
   function tickClock() {
@@ -121,7 +140,7 @@
       .slice(0, limit)
       .map((r, i) => {
         const cls = [r.id === highlightId ? 'hl' : '', me && r.name === me ? 'me' : ''].join(' ');
-        return `<tr class="${cls}"><td><span class="rk rk${i + 1}">${i + 1}</span></td><td>${esc(r.name)}</td><td class="r b">${g.fmt(r.score)}</td><td class="r muted hide-sm">${fmtDate(r.t)}</td></tr>`;
+        return `<tr class="${cls}"><td><span class="rk rk${i + 1}">${i + 1}</span></td><td class="wrap">${esc(r.name)} ${groupTag(r.group)}</td><td class="r b">${g.fmt(r.score)}</td><td class="r muted hide-sm">${fmtDate(r.t)}</td></tr>`;
       })
       .join('')}</tbody></table>`;
   }
@@ -138,7 +157,7 @@
           <p class="sub">${me ? esc(me) + '님, ' : ''}오늘도 성실한 업무 처리 부탁드립니다.</p>
         </div>
         <div class="head-actions">
-          <button class="btn" id="btnName">담당자 설정</button>
+          <button class="btn" id="btnName">사용자 설정</button>
           <a class="btn primary" href="#/game/${GAMES[Math.floor(Math.random() * GAMES.length)].id}">+ 신규 업무 처리</a>
         </div>
       </div>
@@ -219,7 +238,7 @@
             .filter((r) => byId[r.gameId])
             .map((r) => {
               const g = byId[r.gameId];
-              return `<tr><td><span class="badge gray">${g.code}</span></td><td class="wrap">${esc(r.name)}</td><td class="r b">${g.fmt(r.score)}</td><td class="r muted">${fmtDate(r.t)}</td></tr>`;
+              return `<tr><td><span class="badge gray">${g.code}</span></td><td class="wrap">${esc(r.name)} ${groupTag(r.group)}</td><td class="r b">${g.fmt(r.score)}</td><td class="r muted">${fmtDate(r.t)}</td></tr>`;
             })
             .join('')}</tbody></table>`
         : '<div class="empty">아직 등록된 실적이 없습니다.</div>'
@@ -374,11 +393,7 @@
           <tr><th>처리 실적</th><td class="result">${g.fmt(score)}</td></tr>
           <tr><th>예상 순위</th><td id="mRank"><span class="muted">조회 중…</span></td></tr>
         </table>
-        <label class="lbl" for="nmInput">담당자명 <span class="muted">(선택 · 미입력 시 랜덤 아이디)</span></label>
-        <div class="row">
-          <input class="inp" id="nmInput" maxlength="16" autocomplete="off" placeholder="예) ${esc(randomName())}" value="${esc(getName())}" />
-          <button class="btn" id="nmRand" title="랜덤 아이디">🎲 랜덤</button>
-        </div>
+        ${profileFields()}
         <p class="form-err hidden" id="mErr"></p>
       </div>
       <div class="modal-f">
@@ -402,10 +417,12 @@
       btn.disabled = $('#mSkip').disabled = true;
       btn.textContent = '등록 중…';
       const name = inp.value.trim().slice(0, 16) || randomName();
+      const group = cleanGroup($('#grInput').value);
       setName(name);
+      setGroup(group);
       inp.value = name;
       try {
-        const r = await DB.add(g, name, score);
+        const r = await DB.add(g, name, group, score);
         closeModal();
         renderBoard(g, r.id);
         toast(`실적이 등록되었습니다 · ${esc(name)}${r.rank ? ` · ${r.rank}위` : ''}`);
@@ -419,9 +436,11 @@
       }
     };
     $('#mSave').addEventListener('click', save);
-    inp.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.isComposing) save();
-    });
+    [inp, $('#grInput')].forEach((el) =>
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.isComposing) save();
+      })
+    );
     setTimeout(() => $('#mSave').focus(), 0);
   }
 
@@ -444,14 +463,10 @@
 
   function openNameModal() {
     openModal(
-      `<div class="modal-h">담당자 설정</div>
+      `<div class="modal-h">사용자 설정</div>
       <div class="modal-b">
-        <label class="lbl" for="nmInput">담당자명 <span class="muted">(선택 · 미입력 시 랜덤 아이디)</span></label>
-        <div class="row">
-          <input class="inp" id="nmInput" maxlength="16" autocomplete="off" placeholder="예) ${esc(randomName())}" value="${esc(getName())}" />
-          <button class="btn" id="nmRand">🎲 랜덤</button>
-        </div>
-        <p class="muted sm">실적 등록 시 이 이름이 기본으로 사용됩니다.</p>
+        ${profileFields()}
+        <p class="muted sm">실적 등록 시 이 이름과 그룹이 기본으로 사용됩니다.</p>
       </div>
       <div class="modal-f"><button class="btn" id="mCancel">취소</button><button class="btn primary" id="mSave">저장</button></div>`,
       () => {
@@ -463,14 +478,18 @@
     $('#mCancel').addEventListener('click', closeModal);
     const save = () => {
       const name = inp.value.trim().slice(0, 16) || randomName();
+      const group = cleanGroup($('#grInput').value);
       setName(name);
+      setGroup(group);
       closeModal();
-      toast('담당자가 ' + esc(name) + '(으)로 설정되었습니다');
+      toast(`${esc(name)} (${esc(group)})(으)로 설정되었습니다`);
     };
     $('#mSave').addEventListener('click', save);
-    inp.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.isComposing) save();
-    });
+    [inp, $('#grInput')].forEach((el) =>
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.isComposing) save();
+      })
+    );
     setTimeout(() => inp.focus(), 0);
   }
 
