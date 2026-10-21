@@ -433,3 +433,10 @@ button { font: inherit; color: inherit; }
   .react-pad { height: 260px; }
 }
 .tbl td.wrap { white-space: normal; word-break: keep-all; }
+.empty.err { color: var(--ng); }
+.form-err { color: var(--ng); font-size: 12px; margin: 10px 0 0; }
+.btn:disabled { opacity: 0.6; cursor: default; }
+.db-mode { margin-top: 6px; display: flex; align-items: center; gap: 6px; }
+.dot-on, .dot-off { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.dot-on { background: #34c759; }
+.dot-off { background: #8a94a6; }

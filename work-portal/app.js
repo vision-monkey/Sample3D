@@ -43,21 +43,7 @@
     renderUser();
   }
 
-  const records = (id) => store.get('wp_rec_' + id, []);
-  const cmp = (g) => (a, b) => (g.higher ? b.score - a.score : a.score - b.score) || a.t - b.t;
-  function addRecord(g, name, score) {
-    const list = records(g.id);
-    const r = { name, score, t: Date.now() };
-    list.push(r);
-    list.sort(cmp(g));
-    store.set('wp_rec_' + g.id, list.slice(0, 100));
-    return { rank: list.indexOf(r) + 1, total: list.length, t: r.t };
-  }
-  function predictRank(g, score) {
-    const list = records(g.id);
-    const better = list.filter((r) => (g.higher ? r.score >= score : r.score <= score)).length;
-    return { rank: better + 1, total: list.length + 1 };
-  }
+  const DB = window.WP_DB;
 
   const today = () => new Date().toISOString().slice(0, 10);
   function countPlay() {
@@ -80,6 +66,7 @@
   let current = null; // 실행 중인 게임 인스턴스
   let bossOn = false;
   let modalOn = false;
+  let viewSeq = 0; // 화면 전환 시 증가 → 늦게 도착한 조회 결과는 버린다
   const paused = () => bossOn || modalOn;
 
   function stopGame() {
@@ -115,13 +102,25 @@
     $('#clock').textContent = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} (${w}) ${p(d.getHours())}:${p(d.getMinutes())}`;
   }
 
-  function boardHTML(g, list, limit, highlightT) {
+  const LOADING = '<div class="empty">불러오는 중…</div>';
+  const errHTML = (e) => `<div class="empty err">실적을 불러오지 못했습니다.<br><span class="sm">${esc(e.message)}</span></div>`;
+  // 비동기 조회 결과를 현재 화면이 그대로일 때만 sel 위치에 그린다
+  function fill(sel, promise, render, onError = errHTML) {
+    const seq = viewSeq;
+    const put = (html) => {
+      const el = seq === viewSeq && $(sel);
+      if (el) el.innerHTML = html;
+    };
+    return promise.then((v) => put(render(v)), (e) => put(onError(e)));
+  }
+
+  function boardHTML(g, list, limit, highlightId) {
     if (!list.length) return '<div class="empty">등록된 실적이 없습니다.</div>';
     const me = getName();
     return `<table class="tbl rank-tbl"><thead><tr><th>순위</th><th>담당자</th><th class="r">실적</th><th class="r hide-sm">등록일시</th></tr></thead><tbody>${list
       .slice(0, limit)
       .map((r, i) => {
-        const cls = [r.t === highlightT ? 'hl' : '', me && r.name === me ? 'me' : ''].join(' ');
+        const cls = [r.id === highlightId ? 'hl' : '', me && r.name === me ? 'me' : ''].join(' ');
         return `<tr class="${cls}"><td><span class="rk rk${i + 1}">${i + 1}</span></td><td>${esc(r.name)}</td><td class="r b">${g.fmt(r.score)}</td><td class="r muted hide-sm">${fmtDate(r.t)}</td></tr>`;
       })
       .join('')}</tbody></table>`;
@@ -130,13 +129,6 @@
   /* ---------------- 대시보드 ---------------- */
   function renderDashboard() {
     const me = getName();
-    const all = GAMES.map((g) => ({ g, list: records(g.id) }));
-    const totalRec = all.reduce((s, x) => s + x.list.length, 0);
-    const myTop = me ? all.filter((x) => x.list[0] && x.list[0].name === me).length : 0;
-    const recent = all
-      .flatMap((x) => x.list.map((r) => ({ ...r, g: x.g })))
-      .sort((a, b) => b.t - a.t)
-      .slice(0, 6);
 
     main.innerHTML = `
       <div class="page-head">
@@ -154,8 +146,8 @@
       <div class="kpis">
         <div class="kpi"><div class="kpi-l">등록 업무 모듈</div><div class="kpi-v">${GAMES.length}<small>개</small></div><div class="kpi-d up">정상 가동</div></div>
         <div class="kpi"><div class="kpi-l">금일 처리 건수</div><div class="kpi-v">${playsToday()}<small>건</small></div><div class="kpi-d">${today()} 기준</div></div>
-        <div class="kpi"><div class="kpi-l">누적 실적 등록</div><div class="kpi-v">${totalRec}<small>건</small></div><div class="kpi-d">전체 업무 합산</div></div>
-        <div class="kpi"><div class="kpi-l">내 1위 업무</div><div class="kpi-v">${myTop}<small>개</small></div><div class="kpi-d ${myTop ? 'up' : ''}">${me ? esc(me) : '담당자 미설정'}</div></div>
+        <div class="kpi"><div class="kpi-l">누적 실적 등록</div><div class="kpi-v"><span id="kpiTotal">…</span><small>건</small></div><div class="kpi-d">전체 업무 합산</div></div>
+        <div class="kpi"><div class="kpi-l">내 1위 업무</div><div class="kpi-v"><span id="kpiTop">…</span><small>개</small></div><div class="kpi-d" id="kpiTopD">${me ? esc(me) : '담당자 미설정'}</div></div>
       </div>
 
       <div class="layout-2">
@@ -164,14 +156,14 @@
           <div class="panel-b p0 scroll-x">
             <table class="tbl mod-tbl">
               <thead><tr><th class="hide-sm">업무코드</th><th>업무명</th><th class="hide-sm">내용</th><th class="r">최고 실적</th><th class="hide-sm">담당자</th><th></th></tr></thead>
-              <tbody>${all
-                .map(({ g, list }) => `
+              <tbody>${GAMES
+                .map((g) => `
                 <tr>
                   <td class="hide-sm"><span class="badge">${g.code}</span></td>
                   <td class="b"><a href="#/game/${g.id}">${g.title}</a></td>
                   <td class="muted hide-sm desc">${g.short}</td>
-                  <td class="r">${list[0] ? g.fmt(list[0].score) : '<span class="muted">-</span>'}</td>
-                  <td class="hide-sm">${list[0] ? esc(list[0].name) : '<span class="muted">미지정</span>'}</td>
+                  <td class="r" id="best-${g.id}"><span class="muted">…</span></td>
+                  <td class="hide-sm" id="owner-${g.id}"><span class="muted">…</span></td>
                   <td class="r"><a class="btn sm" href="#/game/${g.id}">처리</a></td>
                 </tr>`)
                 .join('')}</tbody>
@@ -188,23 +180,50 @@
                 <li><span class="tag">시스템</span>ESC 키로 보고서 화면 즉시 전환 기능 추가<span class="muted">10-18</span></li>
                 <li><span class="tag">인사</span>사내 동호회 신규 회원 모집<span class="muted">10-15</span></li>
                 <li><span class="tag">총무</span>탕비실 커피머신 교체 완료<span class="muted">10-11</span></li>
-                <li><span class="tag">시스템</span>업무 실적은 현재 PC 브라우저에 저장됩니다<span class="muted">10-02</span></li>
+                <li><span class="tag">시스템</span>${DB.mode === 'remote' ? '업무 실적이 전사 공유 서버에 집계됩니다' : '업무 실적은 현재 PC 브라우저에 저장됩니다'}<span class="muted">10-02</span></li>
               </ul>
             </div>
           </section>
           <section class="panel">
             <div class="panel-h"><span>최근 실적 등록</span></div>
-            <div class="panel-b p0">${
-              recent.length
-                ? `<table class="tbl"><tbody>${recent
-                    .map((r) => `<tr><td><span class="badge gray">${r.g.code}</span></td><td class="wrap">${esc(r.name)}</td><td class="r b">${r.g.fmt(r.score)}</td><td class="r muted">${fmtDate(r.t)}</td></tr>`)
-                    .join('')}</tbody></table>`
-                : '<div class="empty">아직 등록된 실적이 없습니다.</div>'
-            }</div>
+            <div class="panel-b p0" id="dashRecent">${LOADING}</div>
           </section>
         </div>
       </div>`;
     $('#btnName').addEventListener('click', openNameModal);
+
+    const seq = viewSeq;
+    Promise.all(GAMES.map((g) => DB.top(g, 1)))
+      .then((tops) => {
+        if (seq !== viewSeq) return;
+        let myTop = 0;
+        GAMES.forEach((g, i) => {
+          const best = tops[i][0];
+          if (best && me && best.name === me) myTop++;
+          $('#best-' + g.id).innerHTML = best ? g.fmt(best.score) : '<span class="muted">-</span>';
+          $('#owner-' + g.id).innerHTML = best ? esc(best.name) : '<span class="muted">미지정</span>';
+        });
+        $('#kpiTop').textContent = myTop;
+        $('#kpiTopD').classList.toggle('up', myTop > 0);
+      })
+      .catch((e) => {
+        if (seq !== viewSeq) return;
+        $('#kpiTop').textContent = '-';
+        GAMES.forEach((g) => ($('#best-' + g.id).innerHTML = $('#owner-' + g.id).innerHTML = '<span class="muted">-</span>'));
+        toast('실적 서버에 연결하지 못했습니다 · ' + esc(e.message));
+      });
+    fill('#kpiTotal', DB.total(GAMES), (n) => n.toLocaleString(), () => '-');
+    fill('#dashRecent', DB.recent(GAMES, 6), (recent) =>
+      recent.length
+        ? `<table class="tbl"><tbody>${recent
+            .filter((r) => byId[r.gameId])
+            .map((r) => {
+              const g = byId[r.gameId];
+              return `<tr><td><span class="badge gray">${g.code}</span></td><td class="wrap">${esc(r.name)}</td><td class="r b">${g.fmt(r.score)}</td><td class="r muted">${fmtDate(r.t)}</td></tr>`;
+            })
+            .join('')}</tbody></table>`
+        : '<div class="empty">아직 등록된 실적이 없습니다.</div>'
+    );
   }
 
   /* ---------------- 실적 현황 ---------------- */
@@ -221,9 +240,10 @@
         (g) => `
         <section class="panel">
           <div class="panel-h"><span><span class="badge">${g.code}</span> ${g.title}</span><a class="muted sm" href="#/game/${g.id}">상세 ›</a></div>
-          <div class="panel-b p0">${boardHTML(g, records(g.id), 5)}</div>
+          <div class="panel-b p0" id="rk-${g.id}">${LOADING}</div>
         </section>`
       ).join('')}</div>`;
+    GAMES.forEach((g) => fill('#rk-' + g.id, DB.top(g, 5), (list) => boardHTML(g, list, 5)));
   }
 
   /* ---------------- 게임 화면 ---------------- */
@@ -250,7 +270,7 @@
         </section>
         <aside class="panel">
           <div class="panel-h"><span>실적 순위 TOP 10</span></div>
-          <div class="panel-b p0" id="gBoard"></div>
+          <div class="panel-b p0" id="gBoard">${LOADING}</div>
         </aside>
       </div>`;
     $('#gStop').addEventListener('click', () => {
@@ -261,9 +281,8 @@
     renderBoard(g);
   }
 
-  function renderBoard(g, highlightT) {
-    const el = $('#gBoard');
-    if (el) el.innerHTML = boardHTML(g, records(g.id), 10, highlightT);
+  function renderBoard(g, highlightId) {
+    fill('#gBoard', DB.top(g, 10), (list) => boardHTML(g, list, 10, highlightId));
   }
 
   function setStatus(text, cls) {
@@ -277,7 +296,6 @@
   function renderIntro(g, last) {
     setStatus('대기');
     const area = $('#gArea');
-    const best = records(g.id)[0];
     area.innerHTML = `
       <div class="intro">
         <div class="intro-grid">
@@ -288,13 +306,19 @@
           <table class="kv">
             <tr><th>업무코드</th><td>${g.code}</td></tr>
             <tr><th>평가 기준</th><td>${g.higher ? '높을수록 우수' : '낮을수록 우수'}</td></tr>
-            <tr><th>최고 실적</th><td>${best ? `${g.fmt(best.score)} <span class="muted">(${esc(best.name)})</span>` : '-'}</td></tr>
+            <tr><th>최고 실적</th><td id="introBest"><span class="muted">…</span></td></tr>
             ${last != null ? `<tr><th>최근 처리</th><td class="b">${last}</td></tr>` : ''}
           </table>
         </div>
         <div class="intro-actions"><button class="btn primary lg" id="gStart">${last != null ? '다시 처리' : '업무 시작'}</button></div>
       </div>`;
     $('#gStart').addEventListener('click', () => startGame(g));
+    fill(
+      '#introBest',
+      DB.top(g, 1),
+      ([best]) => (best ? `${g.fmt(best.score)} <span class="muted">(${esc(best.name)})</span>` : '-'),
+      () => '-'
+    );
   }
 
   function startGame(g) {
@@ -342,20 +366,20 @@
   }
 
   function showResult(g, score) {
-    const pr = predictRank(g, score);
     openModal(
       `<div class="modal-h">업무 처리 완료 보고</div>
       <div class="modal-b">
         <table class="kv">
           <tr><th>업무</th><td>${g.code} ${g.title}</td></tr>
           <tr><th>처리 실적</th><td class="result">${g.fmt(score)}</td></tr>
-          <tr><th>예상 순위</th><td><b>${pr.rank}위</b> <span class="muted">/ ${pr.total}건</span></td></tr>
+          <tr><th>예상 순위</th><td id="mRank"><span class="muted">조회 중…</span></td></tr>
         </table>
         <label class="lbl" for="nmInput">담당자명 <span class="muted">(선택 · 미입력 시 랜덤 아이디)</span></label>
         <div class="row">
           <input class="inp" id="nmInput" maxlength="16" autocomplete="off" placeholder="예) ${esc(randomName())}" value="${esc(getName())}" />
           <button class="btn" id="nmRand" title="랜덤 아이디">🎲 랜덤</button>
         </div>
+        <p class="form-err hidden" id="mErr"></p>
       </div>
       <div class="modal-f">
         <button class="btn" id="mSkip">등록 안 함</button>
@@ -369,13 +393,30 @@
       inp.focus();
     });
     $('#mSkip').addEventListener('click', closeModal);
-    const save = () => {
+    fill('#mRank', DB.rankOf(g, score), (pr) => `<b>${pr.rank}위</b> <span class="muted">/ ${pr.total}건</span>`, () => '<span class="muted">-</span>');
+    let saving = false;
+    const save = async () => {
+      if (saving) return;
+      saving = true;
+      const btn = $('#mSave');
+      btn.disabled = $('#mSkip').disabled = true;
+      btn.textContent = '등록 중…';
       const name = inp.value.trim().slice(0, 16) || randomName();
       setName(name);
-      const r = addRecord(g, name, score);
-      closeModal();
-      renderBoard(g, r.t);
-      toast(`실적이 등록되었습니다 · ${esc(name)} · ${r.rank}위`);
+      inp.value = name;
+      try {
+        const r = await DB.add(g, name, score);
+        closeModal();
+        renderBoard(g, r.id);
+        toast(`실적이 등록되었습니다 · ${esc(name)}${r.rank ? ` · ${r.rank}위` : ''}`);
+      } catch (e) {
+        saving = false;
+        btn.disabled = $('#mSkip').disabled = false;
+        btn.textContent = '다시 등록';
+        const err = $('#mErr');
+        err.textContent = '실적 등록에 실패했습니다. 잠시 후 다시 시도해 주세요. (' + e.message + ')';
+        err.classList.remove('hidden');
+      }
     };
     $('#mSave').addEventListener('click', save);
     inp.addEventListener('keydown', (e) => {
@@ -482,6 +523,7 @@
 
   /* ---------------- 라우팅 ---------------- */
   function route() {
+    viewSeq++;
     stopGame();
     if (modalOn) closeModal();
     const h = location.hash.replace(/^#\/?/, '');
@@ -503,6 +545,7 @@
   /* ---------------- 초기화 ---------------- */
   renderNav();
   renderUser();
+  $('#dbMode').innerHTML = DB.mode === 'remote' ? '<span class="dot-on"></span>공유 서버 연결됨' : '<span class="dot-off"></span>로컬 저장 모드';
   buildBoss();
   tickClock();
   setInterval(tickClock, 10000);
