@@ -1,0 +1,26 @@
+name: Check work-portal (read-only)
+on:
+  push:
+    branches: [ccr-dfd948e5-vy9aup]
+    paths: [.github/workflows/check-work-portal.yml]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Stats SQL + deployed site checks
+        run: |
+          B=https://jdsijuzddnbpambncaaz.supabase.co/rest/v1
+          K=sb_publishable_aetzy_5TBbXIcFNXojAaOw_0JDWiNzl
+          echo "--- track visit with test id (expect 204)"
+          curl -sS -m 20 -w "[HTTP %{http_code}]\n" -X POST "$B/rpc/track" -H "apikey: $K" -H "Content-Type: application/json" -d '{"p_kind":"visit","p_game":null,"p_visitor":"vcheckgithubactions"}'
+          echo "--- track invalid kind (expect 204, silently ignored)"
+          curl -sS -m 20 -w "[HTTP %{http_code}]\n" -X POST "$B/rpc/track" -H "apikey: $K" -H "Content-Type: application/json" -d '{"p_kind":"drop","p_game":null,"p_visitor":"vcheckgithubactions"}'
+          for t in events stats_daily stats_games; do echo "--- read $t from site key (expect 401/403/404)"; curl -sS -m 20 -w "[HTTP %{http_code}]\n" "$B/$t?limit=1" -H "apikey: $K"; echo; done
+          echo "--- latest records (are new registrations coming in after deploy?)"
+          curl -sS -m 20 "$B/records?select=id,game_id,group_name,created_at&order=created_at.desc&limit=3" -H "apikey: $K"; echo
+          echo "--- deployed site"
+          S=https://vision-monkey.github.io/Sample3D/work-portal
+          for f in index.html privacy.html app.js db.js; do echo "$f: $(curl -sS -m 20 -o /dev/null -w '%{http_code}' $S/$f)"; done
+          echo "db.js has track(): $(curl -sS -m 20 $S/db.js | grep -c "rpc('track'")"
+          echo "db.js has submit_record: $(curl -sS -m 20 $S/db.js | grep -c submit_record)"
+          echo "index brand: $(curl -sS -m 20 $S/index.html | grep -o '<title>[^<]*</title>')"
