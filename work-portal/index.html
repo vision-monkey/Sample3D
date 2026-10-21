@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WorkSpace 업무 포털</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <span class="brand-mark">W</span>
+      <div>
+        <div class="brand-name">WorkSpace</div>
+        <div class="brand-sub">통합 업무 포털 v4.2</div>
+      </div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <div>© 2026 WorkSpace Corp.</div>
+      <div class="muted">ESC: 보고서 화면 전환</div>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <div class="main-wrap">
+    <header class="topbar">
+      <button class="icon-btn menu-btn" id="menuBtn" aria-label="메뉴">☰</button>
+      <div class="search">
+        <span class="search-ico">⌕</span>
+        <input type="text" placeholder="메뉴, 문서, 담당자 검색" aria-label="검색" />
+      </div>
+      <div class="top-right">
+        <span class="clock" id="clock"></span>
+        <button class="icon-btn" id="bossBtn" title="보고서 화면 전환 (ESC)">▤</button>
+        <button class="icon-btn bell" title="알림">🔔<span class="dot">3</span></button>
+        <button class="user-chip" id="userChip">
+          <span class="avatar" id="avatar">?</span>
+          <span class="user-meta">
+            <span class="user-name" id="userName">게스트</span>
+            <span class="user-dept">경영지원본부 · 사원</span>
+          </span>
+        </button>
+      </div>
+    </header>
+    <main class="main" id="main"></main>
+  </div>
+</div>
+
+<div class="modal-back hidden" id="modalBack"><div class="modal" id="modal"></div></div>
+<div class="toast" id="toast"></div>
+<div class="boss hidden" id="boss"></div>
+
+<script src="games.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,522 @@
+(function () {
+  'use strict';
+
+  /* ---------------- 랜덤 아이디 ---------------- */
+  const ADJ = [
+    '달리는', '졸린', '배고픈', '퇴근하는', '야근하는', '행복한', '수상한', '용감한', '느긋한', '바쁜척하는',
+    '출근한', '커피마시는', '멍때리는', '춤추는', '날아가는', '몰래보는', '신난', '우아한', '귀여운', '엉뚱한',
+    '조용한', '반짝이는', '뒹구는', '꾸벅이는', '월급받는', '칼퇴하는', '점심먹는', '회의하는', '노래하는', '숨어있는',
+  ];
+  const NOUN = [
+    '만두', '고양이', '감자', '펭귄', '대리', '과장', '부장', '인턴', '판다', '다람쥐',
+    '호떡', '김밥', '수달', '두부', '붕어빵', '너구리', '햄스터', '오리', '떡볶이', '고등어',
+    '라면', '스테이플러', '복사기', '모니터', '키보드', '결재판', '포스트잇', '탕비실', '단무지', '찐빵',
+  ];
+  const pick = (a) => a[Math.floor(Math.random() * a.length)];
+  const randomName = () => pick(ADJ) + ' ' + pick(NOUN);
+
+  /* ---------------- 저장소 ---------------- */
+  const store = {
+    get(k, d) {
+      try {
+        const v = localStorage.getItem(k);
+        return v == null ? d : JSON.parse(v);
+      } catch (e) {
+        return d;
+      }
+    },
+    set(k, v) {
+      try {
+        localStorage.setItem(k, JSON.stringify(v));
+      } catch (e) { /* 저장 불가 환경은 무시 */ }
+    },
+  };
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const $ = (sel, root = document) => root.querySelector(sel);
+
+  const GAMES = window.WP_GAMES;
+  const byId = Object.fromEntries(GAMES.map((g) => [g.id, g]));
+
+  const getName = () => store.get('wp_name', '');
+  function setName(n) {
+    store.set('wp_name', n);
+    renderUser();
+  }
+
+  const records = (id) => store.get('wp_rec_' + id, []);
+  const cmp = (g) => (a, b) => (g.higher ? b.score - a.score : a.score - b.score) || a.t - b.t;
+  function addRecord(g, name, score) {
+    const list = records(g.id);
+    const r = { name, score, t: Date.now() };
+    list.push(r);
+    list.sort(cmp(g));
+    store.set('wp_rec_' + g.id, list.slice(0, 100));
+    return { rank: list.indexOf(r) + 1, total: list.length, t: r.t };
+  }
+  function predictRank(g, score) {
+    const list = records(g.id);
+    const better = list.filter((r) => (g.higher ? r.score >= score : r.score <= score)).length;
+    return { rank: better + 1, total: list.length + 1 };
+  }
+
+  const today = () => new Date().toISOString().slice(0, 10);
+  function countPlay() {
+    const p = store.get('wp_plays', { d: '', n: 0 });
+    store.set('wp_plays', p.d === today() ? { d: p.d, n: p.n + 1 } : { d: today(), n: 1 });
+  }
+  const playsToday = () => {
+    const p = store.get('wp_plays', { d: '', n: 0 });
+    return p.d === today() ? p.n : 0;
+  };
+
+  function fmtDate(t) {
+    const d = new Date(t);
+    const p = (n) => String(n).padStart(2, '0');
+    return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+
+  /* ---------------- 상태 ---------------- */
+  const main = $('#main');
+  let current = null; // 실행 중인 게임 인스턴스
+  let bossOn = false;
+  let modalOn = false;
+  const paused = () => bossOn || modalOn;
+
+  function stopGame() {
+    if (current) {
+      current.destroy && current.destroy();
+      current = null;
+    }
+  }
+
+  /* ---------------- 레이아웃 ---------------- */
+  function renderNav() {
+    const items = [
+      `<div class="nav-sec">메인</div>`,
+      `<a href="#/" data-nav=""><span class="nav-ico">▦</span>대시보드</a>`,
+      `<a href="#/ranking" data-nav="ranking"><span class="nav-ico">▲</span>실적 현황</a>`,
+      `<div class="nav-sec">업무 모듈</div>`,
+      ...GAMES.map((g) => `<a href="#/game/${g.id}" data-nav="game/${g.id}"><span class="nav-code">${g.code.slice(3)}</span>${g.title}</a>`),
+    ];
+    $('#nav').innerHTML = items.join('');
+  }
+  function setActiveNav(key) {
+    document.querySelectorAll('#nav a').forEach((a) => a.classList.toggle('active', a.dataset.nav === key));
+  }
+  function renderUser() {
+    const n = getName();
+    $('#userName').textContent = n || '게스트';
+    $('#avatar').textContent = n ? n.trim().split(' ').pop()[0] : '?';
+  }
+  function tickClock() {
+    const d = new Date();
+    const w = '일월화수목금토'[d.getDay()];
+    const p = (n) => String(n).padStart(2, '0');
+    $('#clock').textContent = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} (${w}) ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+
+  function boardHTML(g, list, limit, highlightT) {
+    if (!list.length) return '<div class="empty">등록된 실적이 없습니다.</div>';
+    const me = getName();
+    return `<table class="tbl rank-tbl"><thead><tr><th>순위</th><th>담당자</th><th class="r">실적</th><th class="r hide-sm">등록일시</th></tr></thead><tbody>${list
+      .slice(0, limit)
+      .map((r, i) => {
+        const cls = [r.t === highlightT ? 'hl' : '', me && r.name === me ? 'me' : ''].join(' ');
+        return `<tr class="${cls}"><td><span class="rk rk${i + 1}">${i + 1}</span></td><td>${esc(r.name)}</td><td class="r b">${g.fmt(r.score)}</td><td class="r muted hide-sm">${fmtDate(r.t)}</td></tr>`;
+      })
+      .join('')}</tbody></table>`;
+  }
+
+  /* ---------------- 대시보드 ---------------- */
+  function renderDashboard() {
+    const me = getName();
+    const all = GAMES.map((g) => ({ g, list: records(g.id) }));
+    const totalRec = all.reduce((s, x) => s + x.list.length, 0);
+    const myTop = me ? all.filter((x) => x.list[0] && x.list[0].name === me).length : 0;
+    const recent = all
+      .flatMap((x) => x.list.map((r) => ({ ...r, g: x.g })))
+      .sort((a, b) => b.t - a.t)
+      .slice(0, 6);
+
+    main.innerHTML = `
+      <div class="page-head">
+        <div>
+          <div class="crumb">홈 › 대시보드</div>
+          <h1>업무 현황 대시보드</h1>
+          <p class="sub">${me ? esc(me) + '님, ' : ''}오늘도 성실한 업무 처리 부탁드립니다.</p>
+        </div>
+        <div class="head-actions">
+          <button class="btn" id="btnName">담당자 설정</button>
+          <a class="btn primary" href="#/game/${GAMES[Math.floor(Math.random() * GAMES.length)].id}">+ 신규 업무 처리</a>
+        </div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi"><div class="kpi-l">등록 업무 모듈</div><div class="kpi-v">${GAMES.length}<small>개</small></div><div class="kpi-d up">정상 가동</div></div>
+        <div class="kpi"><div class="kpi-l">금일 처리 건수</div><div class="kpi-v">${playsToday()}<small>건</small></div><div class="kpi-d">${today()} 기준</div></div>
+        <div class="kpi"><div class="kpi-l">누적 실적 등록</div><div class="kpi-v">${totalRec}<small>건</small></div><div class="kpi-d">전체 업무 합산</div></div>
+        <div class="kpi"><div class="kpi-l">내 1위 업무</div><div class="kpi-v">${myTop}<small>개</small></div><div class="kpi-d ${myTop ? 'up' : ''}">${me ? esc(me) : '담당자 미설정'}</div></div>
+      </div>
+
+      <div class="layout-2">
+        <section class="panel">
+          <div class="panel-h"><span>업무 모듈 목록</span><span class="muted sm">총 ${GAMES.length}건</span></div>
+          <div class="panel-b p0 scroll-x">
+            <table class="tbl mod-tbl">
+              <thead><tr><th class="hide-sm">업무코드</th><th>업무명</th><th class="hide-sm">내용</th><th class="r">최고 실적</th><th class="hide-sm">담당자</th><th></th></tr></thead>
+              <tbody>${all
+                .map(({ g, list }) => `
+                <tr>
+                  <td class="hide-sm"><span class="badge">${g.code}</span></td>
+                  <td class="b"><a href="#/game/${g.id}">${g.title}</a></td>
+                  <td class="muted hide-sm desc">${g.short}</td>
+                  <td class="r">${list[0] ? g.fmt(list[0].score) : '<span class="muted">-</span>'}</td>
+                  <td class="hide-sm">${list[0] ? esc(list[0].name) : '<span class="muted">미지정</span>'}</td>
+                  <td class="r"><a class="btn sm" href="#/game/${g.id}">처리</a></td>
+                </tr>`)
+                .join('')}</tbody>
+            </table>
+          </div>
+        </section>
+
+        <div class="col">
+          <section class="panel">
+            <div class="panel-h"><span>공지사항</span><span class="muted sm">더보기 ›</span></div>
+            <div class="panel-b p0">
+              <ul class="notice">
+                <li><span class="tag red">필독</span>4분기 정보보안 교육 이수 안내<span class="muted">10-20</span></li>
+                <li><span class="tag">시스템</span>ESC 키로 보고서 화면 즉시 전환 기능 추가<span class="muted">10-18</span></li>
+                <li><span class="tag">인사</span>사내 동호회 신규 회원 모집<span class="muted">10-15</span></li>
+                <li><span class="tag">총무</span>탕비실 커피머신 교체 완료<span class="muted">10-11</span></li>
+                <li><span class="tag">시스템</span>업무 실적은 현재 PC 브라우저에 저장됩니다<span class="muted">10-02</span></li>
+              </ul>
+            </div>
+          </section>
+          <section class="panel">
+            <div class="panel-h"><span>최근 실적 등록</span></div>
+            <div class="panel-b p0">${
+              recent.length
+                ? `<table class="tbl"><tbody>${recent
+                    .map((r) => `<tr><td><span class="badge gray">${r.g.code}</span></td><td class="wrap">${esc(r.name)}</td><td class="r b">${r.g.fmt(r.score)}</td><td class="r muted">${fmtDate(r.t)}</td></tr>`)
+                    .join('')}</tbody></table>`
+                : '<div class="empty">아직 등록된 실적이 없습니다.</div>'
+            }</div>
+          </section>
+        </div>
+      </div>`;
+    $('#btnName').addEventListener('click', openNameModal);
+  }
+
+  /* ---------------- 실적 현황 ---------------- */
+  function renderRanking() {
+    main.innerHTML = `
+      <div class="page-head">
+        <div>
+          <div class="crumb">홈 › 실적 현황</div>
+          <h1>업무별 실적 현황</h1>
+          <p class="sub">업무 모듈별 상위 5명의 처리 실적입니다.</p>
+        </div>
+      </div>
+      <div class="rank-grid">${GAMES.map(
+        (g) => `
+        <section class="panel">
+          <div class="panel-h"><span><span class="badge">${g.code}</span> ${g.title}</span><a class="muted sm" href="#/game/${g.id}">상세 ›</a></div>
+          <div class="panel-b p0">${boardHTML(g, records(g.id), 5)}</div>
+        </section>`
+      ).join('')}</div>`;
+  }
+
+  /* ---------------- 게임 화면 ---------------- */
+  function renderGame(g) {
+    main.innerHTML = `
+      <div class="page-head">
+        <div>
+          <div class="crumb">홈 › 업무 모듈 › ${g.code}</div>
+          <h1>${g.title}</h1>
+          <p class="sub">${g.desc}</p>
+        </div>
+        <div class="head-actions">
+          <span class="badge">${g.code}</span>
+          <span class="badge gray">평가 기준: ${g.higher ? '높을수록 우수' : '낮을수록 우수'}</span>
+        </div>
+      </div>
+      <div class="layout-2">
+        <section class="panel">
+          <div class="panel-h">
+            <span>작업 영역 <span class="status" id="gStatus">대기</span></span>
+            <span class="panel-tools"><button class="btn sm hidden" id="gStop">중단</button></span>
+          </div>
+          <div class="panel-b game-area" id="gArea"></div>
+        </section>
+        <aside class="panel">
+          <div class="panel-h"><span>실적 순위 TOP 10</span></div>
+          <div class="panel-b p0" id="gBoard"></div>
+        </aside>
+      </div>`;
+    $('#gStop').addEventListener('click', () => {
+      stopGame();
+      renderIntro(g);
+    });
+    renderIntro(g);
+    renderBoard(g);
+  }
+
+  function renderBoard(g, highlightT) {
+    const el = $('#gBoard');
+    if (el) el.innerHTML = boardHTML(g, records(g.id), 10, highlightT);
+  }
+
+  function setStatus(text, cls) {
+    const s = $('#gStatus');
+    if (!s) return;
+    s.textContent = text;
+    s.className = 'status ' + (cls || '');
+    $('#gStop').classList.toggle('hidden', cls !== 'run');
+  }
+
+  function renderIntro(g, last) {
+    setStatus('대기');
+    const area = $('#gArea');
+    const best = records(g.id)[0];
+    area.innerHTML = `
+      <div class="intro">
+        <div class="intro-grid">
+          <div>
+            <h3>업무 처리 절차</h3>
+            <ol class="steps">${g.howto.map((h) => `<li>${h}</li>`).join('')}</ol>
+          </div>
+          <table class="kv">
+            <tr><th>업무코드</th><td>${g.code}</td></tr>
+            <tr><th>평가 기준</th><td>${g.higher ? '높을수록 우수' : '낮을수록 우수'}</td></tr>
+            <tr><th>최고 실적</th><td>${best ? `${g.fmt(best.score)} <span class="muted">(${esc(best.name)})</span>` : '-'}</td></tr>
+            ${last != null ? `<tr><th>최근 처리</th><td class="b">${last}</td></tr>` : ''}
+          </table>
+        </div>
+        <div class="intro-actions"><button class="btn primary lg" id="gStart">${last != null ? '다시 처리' : '업무 시작'}</button></div>
+      </div>`;
+    $('#gStart').addEventListener('click', () => startGame(g));
+  }
+
+  function startGame(g) {
+    stopGame();
+    countPlay();
+    setStatus('진행중', 'run');
+    const area = $('#gArea');
+    area.innerHTML = '';
+    let ended = false;
+    const ctx = {
+      paused,
+      finish(score) {
+        if (ended) return;
+        ended = true;
+        stopGame();
+        setStatus('완료', 'done');
+        showResult(g, score);
+      },
+      fail(msg) {
+        if (ended) return;
+        ended = true;
+        stopGame();
+        setStatus('반려', 'fail');
+        showFail(g, msg);
+      },
+    };
+    current = g.mount(area, ctx);
+  }
+
+  /* ---------------- 모달 ---------------- */
+  function openModal(html, onClose) {
+    modalOn = true;
+    const back = $('#modalBack');
+    $('#modal').innerHTML = html;
+    back.classList.remove('hidden');
+    back._onClose = onClose;
+  }
+  function closeModal() {
+    modalOn = false;
+    const back = $('#modalBack');
+    back.classList.add('hidden');
+    const cb = back._onClose;
+    back._onClose = null;
+    if (cb) cb();
+  }
+
+  function showResult(g, score) {
+    const pr = predictRank(g, score);
+    openModal(
+      `<div class="modal-h">업무 처리 완료 보고</div>
+      <div class="modal-b">
+        <table class="kv">
+          <tr><th>업무</th><td>${g.code} ${g.title}</td></tr>
+          <tr><th>처리 실적</th><td class="result">${g.fmt(score)}</td></tr>
+          <tr><th>예상 순위</th><td><b>${pr.rank}위</b> <span class="muted">/ ${pr.total}건</span></td></tr>
+        </table>
+        <label class="lbl" for="nmInput">담당자명 <span class="muted">(선택 · 미입력 시 랜덤 아이디)</span></label>
+        <div class="row">
+          <input class="inp" id="nmInput" maxlength="16" autocomplete="off" placeholder="예) ${esc(randomName())}" value="${esc(getName())}" />
+          <button class="btn" id="nmRand" title="랜덤 아이디">🎲 랜덤</button>
+        </div>
+      </div>
+      <div class="modal-f">
+        <button class="btn" id="mSkip">등록 안 함</button>
+        <button class="btn primary" id="mSave">실적 등록</button>
+      </div>`,
+      () => renderIntro(g, g.fmt(score))
+    );
+    const inp = $('#nmInput');
+    $('#nmRand').addEventListener('click', () => {
+      inp.value = randomName();
+      inp.focus();
+    });
+    $('#mSkip').addEventListener('click', closeModal);
+    const save = () => {
+      const name = inp.value.trim().slice(0, 16) || randomName();
+      setName(name);
+      const r = addRecord(g, name, score);
+      closeModal();
+      renderBoard(g, r.t);
+      toast(`실적이 등록되었습니다 · ${esc(name)} · ${r.rank}위`);
+    };
+    $('#mSave').addEventListener('click', save);
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.isComposing) save();
+    });
+    setTimeout(() => $('#mSave').focus(), 0);
+  }
+
+  function showFail(g, msg) {
+    openModal(
+      `<div class="modal-h fail">업무 반려</div>
+      <div class="modal-b"><p>${esc(msg)}</p><p class="muted">실적이 집계되지 않았습니다.</p></div>
+      <div class="modal-f"><button class="btn" id="mClose">닫기</button><button class="btn primary" id="mRetry">재처리</button></div>`,
+      null
+    );
+    $('#mClose').addEventListener('click', () => {
+      closeModal();
+      renderIntro(g);
+    });
+    $('#mRetry').addEventListener('click', () => {
+      closeModal();
+      startGame(g);
+    });
+  }
+
+  function openNameModal() {
+    openModal(
+      `<div class="modal-h">담당자 설정</div>
+      <div class="modal-b">
+        <label class="lbl" for="nmInput">담당자명 <span class="muted">(선택 · 미입력 시 랜덤 아이디)</span></label>
+        <div class="row">
+          <input class="inp" id="nmInput" maxlength="16" autocomplete="off" placeholder="예) ${esc(randomName())}" value="${esc(getName())}" />
+          <button class="btn" id="nmRand">🎲 랜덤</button>
+        </div>
+        <p class="muted sm">실적 등록 시 이 이름이 기본으로 사용됩니다.</p>
+      </div>
+      <div class="modal-f"><button class="btn" id="mCancel">취소</button><button class="btn primary" id="mSave">저장</button></div>`,
+      () => {
+        if (!location.hash || location.hash === '#/') renderDashboard();
+      }
+    );
+    const inp = $('#nmInput');
+    $('#nmRand').addEventListener('click', () => (inp.value = randomName()));
+    $('#mCancel').addEventListener('click', closeModal);
+    const save = () => {
+      const name = inp.value.trim().slice(0, 16) || randomName();
+      setName(name);
+      closeModal();
+      toast('담당자가 ' + esc(name) + '(으)로 설정되었습니다');
+    };
+    $('#mSave').addEventListener('click', save);
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.isComposing) save();
+    });
+    setTimeout(() => inp.focus(), 0);
+  }
+
+  let toastTimer = 0;
+  function toast(html) {
+    const t = $('#toast');
+    t.innerHTML = html;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+  }
+
+  /* ---------------- 보스 화면 (ESC) ---------------- */
+  const BOSS_TITLE = '2026_4Q_매출실적_최종_v3(진짜최종).xlsx - Excel';
+  const APP_TITLE = document.title;
+  function buildBoss() {
+    const regions = ['서울', '경기', '인천', '부산', '대구', '광주', '대전', '울산', '세종', '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주'];
+    const prods = ['A제품군', 'B제품군', 'C솔루션'];
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
+    const cols = 'ABCDEFGHIJ'.split('');
+    const rows = [['구분', '지역', '10월', '11월', '12월', '4Q 합계', '목표', '달성률', '전년比', '비고']];
+    let sum = 0;
+    regions.forEach((r, i) => {
+      const m = [0, 1, 2].map(() => Math.round(800 + rnd() * 4200));
+      const tot = m[0] + m[1] + m[2];
+      const goal = Math.round(tot * (0.85 + rnd() * 0.3));
+      sum += tot;
+      rows.push([prods[i % 3], r, ...m.map((v) => v.toLocaleString()), tot.toLocaleString(), goal.toLocaleString(), ((tot / goal) * 100).toFixed(1) + '%', (rnd() * 20 - 5).toFixed(1) + '%', tot > goal ? '' : '확인필요']);
+    });
+    rows.push(['합계', '', '', '', '', sum.toLocaleString(), '', '', '', '']);
+    while (rows.length < 32) rows.push(Array(10).fill(''));
+    $('#boss').innerHTML = `
+      <div class="xl-top"><span class="xl-logo">X</span><span class="xl-name">${BOSS_TITLE}</span><span class="xl-saved">저장됨 ✓</span></div>
+      <div class="xl-menu">${['파일', '홈', '삽입', '페이지 레이아웃', '수식', '데이터', '검토', '보기', '도움말'].map((m, i) => `<span class="${i === 1 ? 'on' : ''}">${m}</span>`).join('')}</div>
+      <div class="xl-ribbon"><span>붙여넣기</span><span>맑은 고딕 ▾</span><span>11 ▾</span><b>가</b><i>가</i><u>가</u><span>│</span><span>≡ 가운데 맞춤</span><span>%</span><span>,</span><span>│</span><span>조건부 서식 ▾</span><span>표 서식 ▾</span><span>Σ 자동 합계 ▾</span></div>
+      <div class="xl-fx"><span class="xl-cell">F19</span><span class="xl-fxi">fx</span><span>=SUM(F2:F18)</span></div>
+      <div class="xl-grid"><table>
+        <thead><tr><th></th>${cols.map((c) => `<th>${c}</th>`).join('')}</tr></thead>
+        <tbody>${rows.map((r, i) => `<tr class="${i === 0 ? 'xh' : r[0] === '합계' ? 'xs' : ''}"><th>${i + 1}</th>${r.map((v, j) => `<td class="${j >= 2 && j <= 8 ? 'r' : ''} ${v === '확인필요' ? 'warn' : ''}">${v}</td>`).join('')}</tr>`).join('')}</tbody>
+      </table></div>
+      <div class="xl-tabs"><span class="on">요약</span><span>월별</span><span>지역별</span><span>원본데이터</span><span>+</span></div>
+      <div class="xl-status"><span>준비</span><span>평균: ${Math.round(sum / regions.length).toLocaleString()} &nbsp; 개수: ${regions.length} &nbsp; 합계: ${sum.toLocaleString()} &nbsp;&nbsp; 100%</span></div>`;
+  }
+  function toggleBoss(force) {
+    bossOn = typeof force === 'boolean' ? force : !bossOn;
+    $('#boss').classList.toggle('hidden', !bossOn);
+    document.title = bossOn ? BOSS_TITLE : APP_TITLE;
+  }
+
+  /* ---------------- 라우팅 ---------------- */
+  function route() {
+    stopGame();
+    if (modalOn) closeModal();
+    const h = location.hash.replace(/^#\/?/, '');
+    const [view, arg] = h.split('/');
+    document.body.classList.remove('nav-open');
+    if (view === 'game' && byId[arg]) {
+      setActiveNav('game/' + arg);
+      renderGame(byId[arg]);
+    } else if (view === 'ranking') {
+      setActiveNav('ranking');
+      renderRanking();
+    } else {
+      setActiveNav('');
+      renderDashboard();
+    }
+    window.scrollTo(0, 0);
+  }
+
+  /* ---------------- 초기화 ---------------- */
+  renderNav();
+  renderUser();
+  buildBoss();
+  tickClock();
+  setInterval(tickClock, 10000);
+  window.addEventListener('hashchange', route);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      toggleBoss();
+    }
+  });
+  $('#bossBtn').addEventListener('click', () => toggleBoss(true));
+  $('#boss').addEventListener('dblclick', () => toggleBoss(false));
+  $('#userChip').addEventListener('click', openNameModal);
+  $('#menuBtn').addEventListener('click', () => document.body.classList.toggle('nav-open'));
+  $('#scrim').addEventListener('click', () => document.body.classList.remove('nav-open'));
+  route();
+})();
