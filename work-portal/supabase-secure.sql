@@ -51,7 +51,7 @@ declare
   v_ip text := wp_client_ip();
   v_id uuid;
 begin
-  if p_game not in ('report','risk','budget','approve','inbox','settle','urgent','match','pipeline','order','risk_hard','dodge') then
+  if p_game not in ('report','risk','budget','approve','inbox','settle','urgent','match','pipeline','order','risk_hard','dodge','diff') then
     raise exception 'invalid_game';
   end if;
   if (select count(*) from game_sessions where ip = v_ip and started_at > now() - interval '1 minute') >= 30 then
@@ -93,6 +93,7 @@ begin
     when 'risk'     then p_score >= 1   and p_score <= el + 1                                     -- 초
     when 'risk_hard' then p_score >= 20 and p_score <= el + 1                                    -- 초 (30×16, 99개)
     when 'dodge'    then p_score >= 1   and p_score <= 1800   and p_score <= el + 1               -- 초 (버틴 시간)
+    when 'diff'     then p_score >= 15  and p_score <= 3600   and el >= 15                        -- 초 (18건 대조, 오검출 패널티 포함)
     when 'budget'   then p_score >= 4   and p_score <= 200000 and el >= p_score / 200             -- 초당 200점 이하
     when 'approve'  then p_score >= 3   and p_score <= 600    and el >= 3                         -- 초 (오처리 패널티 포함)
     when 'inbox'    then p_score >= 0   and p_score <= 60     and el >= 39                        -- 40초 게임
