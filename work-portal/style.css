@@ -479,3 +479,6 @@ button { font: inherit; color: inherit; }
   .sheet.hard th { width: 16px; }
 }
 .layout-2.single { grid-template-columns: minmax(0, 1fr); }
+
+/* 업무 폭탄 회피: 모바일 좌우 버튼 */
+.dodge-pad .btn { width: 120px; height: 48px; font-size: 14px; user-select: none; -webkit-user-select: none; touch-action: none; }
