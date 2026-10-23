@@ -10,7 +10,7 @@ create table if not exists public.records (
 
   constraint records_game_chk  check (game_id in (
     'report', 'risk', 'budget', 'approve', 'inbox',
-    'settle', 'urgent', 'match', 'pipeline', 'order'
+    'settle', 'urgent', 'match', 'pipeline', 'order', 'risk_hard'
   )),
   constraint records_name_chk  check (char_length(btrim(name)) between 1 and 16),
   constraint records_score_chk check (score >= 0 and score < 10000000)
@@ -89,7 +89,7 @@ declare
   v_ip text := wp_client_ip();
   v_id uuid;
 begin
-  if p_game not in ('report','risk','budget','approve','inbox','settle','urgent','match','pipeline','order') then
+  if p_game not in ('report','risk','budget','approve','inbox','settle','urgent','match','pipeline','order','risk_hard') then
     raise exception 'invalid_game';
   end if;
   if (select count(*) from game_sessions where ip = v_ip and started_at > now() - interval '1 minute') >= 30 then
@@ -129,6 +129,7 @@ begin
   ok := case s.game_id
     when 'report'   then p_score > 0    and p_score <= 1200   and el >= 15000 / p_score          -- 타/분, 최소 약 300타 입력
     when 'risk'     then p_score >= 1   and p_score <= el + 1                                     -- 초
+    when 'risk_hard' then p_score >= 20 and p_score <= el + 1                                    -- 초 (30×16, 99개)
     when 'budget'   then p_score >= 4   and p_score <= 200000 and el >= p_score / 200             -- 초당 200점 이하
     when 'approve'  then p_score >= 3   and p_score <= 600    and el >= 3                         -- 초 (오처리 패널티 포함)
     when 'inbox'    then p_score >= 0   and p_score <= 60     and el >= 39                        -- 40초 게임
@@ -178,7 +179,7 @@ create or replace function public.track(p_kind text, p_game text, p_visitor text
 language plpgsql security definer set search_path = public as $$
 begin
   if p_kind not in ('visit', 'play', 'record')
-     or (p_game is not null and p_game not in ('report','risk','budget','approve','inbox','settle','urgent','match','pipeline','order'))
+     or (p_game is not null and p_game not in ('report','risk','budget','approve','inbox','settle','urgent','match','pipeline','order','risk_hard'))
      or p_visitor is null or p_visitor !~ '^[A-Za-z0-9_-]{8,40}$' then
     return;
   end if;

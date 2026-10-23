@@ -466,3 +466,16 @@ button { font: inherit; color: inherit; }
 .doc-page ul { padding-left: 20px; margin: 6px 0; }
 .doc-page table.tbl td { white-space: normal; }
 @media (max-width: 480px) { .doc-page .panel-b { padding: 18px 16px; } }
+
+/* 지뢰찾기 고급 (30×16) */
+.sheet.hard th { width: 22px; height: 20px; font-size: 10px; }
+.sheet.hard td { width: 24px; height: 24px; font-size: 12px; }
+@media (max-width: 860px) {
+  .sheet.hard td { width: 21px; height: 21px; font-size: 11px; }
+  .sheet.hard th { width: 18px; font-size: 9px; }
+}
+@media (max-width: 400px) {
+  .sheet.hard td { width: 19px; height: 19px; font-size: 10px; }
+  .sheet.hard th { width: 16px; }
+}
+.layout-2.single { grid-template-columns: minmax(0, 1fr); }

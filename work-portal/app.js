@@ -409,7 +409,7 @@
           <span class="badge gray">평가 기준: ${g.higher ? '높을수록 우수' : '낮을수록 우수'}</span>
         </div>
       </div>
-      <div class="layout-2">
+      <div class="layout-2${g.wide ? ' single' : ''}">
         <section class="panel">
           <div class="panel-h">
             <span>작업 영역 <span class="status" id="gStatus">대기</span></span>

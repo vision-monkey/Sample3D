@@ -61,6 +61,10 @@ select * from public.stats_games;  -- 최근 30일 게임별 플레이 · 등록
 IP·이름은 저장하지 않고 브라우저별 임의 ID만 쓰며, 13개월 뒤 자동 삭제됩니다. 통계는 사이트에서 읽을 수 없고 대시보드에서만 볼 수 있습니다.
 개인정보처리방침은 `privacy.html`에 있습니다 (사이드바 하단 링크).
 
+### 고급 지뢰찾기 [전사 리스크 정밀 감사] (기존 DB)
+
+WK-111(30×16, 리스크 99개) 기록을 받으려면 SQL Editor에서 `supabase-hard.sql`을 한 번 실행하세요. 기존 기록은 그대로입니다.
+
 ## 동료와 같이 쓰기 (GitHub Pages)
 
 저장소 **Settings → Pages** → Source: `Deploy from a branch`, 브랜치 선택, 폴더 `/ (root)` → Save.
@@ -80,4 +84,5 @@ IP·이름은 저장하지 않고 브라우저별 임의 ID만 쓰며, 13개월 
 | `supabase-group.sql` | 기존 DB에 그룹명 컬럼 추가 SQL |
 | `supabase-secure.sql` | 점수 검증·등록 제한·금칙어 SQL |
 | `supabase-stats.sql` | 방문 통계 SQL |
+| `supabase-hard.sql` | 고급 지뢰찾기(risk_hard) 기록 허용 SQL |
 | `privacy.html` | 개인정보처리방침 |
