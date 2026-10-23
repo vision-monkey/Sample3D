@@ -317,6 +317,8 @@
         return !!token();
       },
       info: () => withToken('org_info', {}),
+      // 서버에 단체 기능(supabase-org.sql)이 있는지: 없는 토큰으로 물어서 not_member 면 준비된 것
+      ready: () => orgCall('org_info', { p_token: '' }).then(() => true, (e) => e.code === 'not_member'),
       create: (name, member) => orgCall('org_create', { p_name: name, p_member_name: member }).then(saveToken),
       join: (invite, member) => orgCall('org_join', { p_invite: invite, p_member_name: member }).then(saveToken),
       updateMe: (name, group) => withToken('org_update_me', { p_name: name, p_group: group }),
