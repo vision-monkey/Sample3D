@@ -173,6 +173,125 @@ window.WP_GAMES = [];
     },
   });
 
+  // 지뢰찾기 공용 보드. 엑셀처럼 열 이름(A, B, … Z, AA …)과 행 번호를 붙인다.
+  const colName = (x) => (x >= 26 ? String.fromCharCode(64 + Math.floor(x / 26)) : '') + String.fromCharCode(65 + (x % 26));
+  function mountMines(root, ctx, { W, H, M, hard = false, loseMsg }) {
+    const T = timers();
+    const cells = Array.from({ length: W * H }, () => ({ mine: false, n: 0, open: false, flag: false }));
+    let started = false, ended = false, t0 = 0, revealed = 0, flags = 0, flagMode = false;
+    const cols = Array.from({ length: W }, (_, x) => colName(x));
+    root.innerHTML = `
+      <div class="g-stats">
+        <span>잔여 리스크 <b data-k="left">${M}</b></span>
+        <span>경과 <b data-k="time">0.0초</b></span>
+        <button class="btn sm" data-k="mode">표시 모드: OFF</button>
+      </div>
+      <div class="sheet-wrap"><table class="sheet ms${hard ? ' hard' : ''}">
+        <thead><tr><th></th>${cols.map((c) => `<th>${c}</th>`).join('')}</tr></thead>
+        <tbody>${Array.from({ length: H }, (_, y) => `<tr><th>${y + 1}</th>${cols.map((_, x) => `<td data-i="${y * W + x}"></td>`).join('')}</tr>`).join('')}</tbody>
+      </table></div>`;
+    const q = (k) => root.querySelector(`[data-k="${k}"]`);
+    const tds = Array.from(root.querySelectorAll('td[data-i]'));
+    const table = root.querySelector('table');
+
+    function nb(i) {
+      const x = i % W, y = Math.floor(i / W), r = [];
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const nx = x + dx, ny = y + dy;
+          if (nx >= 0 && nx < W && ny >= 0 && ny < H) r.push(ny * W + nx);
+        }
+      return r;
+    }
+    function place(safe) {
+      const banned = new Set([safe, ...nb(safe)]);
+      let c = 0;
+      while (c < M) {
+        const i = rand(W * H);
+        if (banned.has(i) || cells[i].mine) continue;
+        cells[i].mine = true;
+        c++;
+      }
+      cells.forEach((cell, i) => (cell.n = nb(i).filter((j) => cells[j].mine).length));
+    }
+    function draw(i) {
+      const c = cells[i], td = tds[i];
+      td.className = c.open ? 'open n' + c.n : c.flag ? 'flag' : '';
+      td.textContent = c.open ? (c.mine ? '✱' : c.n || '') : c.flag ? '⚑' : '';
+    }
+    function open(i) {
+      const c = cells[i];
+      if (c.open || c.flag) return;
+      if (!started) {
+        started = true;
+        place(i);
+        t0 = now();
+        T.interval(() => (q('time').textContent = ((now() - t0) / 1000).toFixed(1) + '초'), 100);
+      }
+      if (c.mine) return lose(i);
+      const st = [i];
+      while (st.length) {
+        const k = st.pop(), d = cells[k];
+        if (d.open || d.flag) continue;
+        d.open = true;
+        revealed++;
+        draw(k);
+        if (d.n === 0) nb(k).forEach((j) => !cells[j].open && st.push(j));
+      }
+      if (revealed === W * H - M) win();
+    }
+    function chord(i) {
+      const c = cells[i];
+      const around = nb(i);
+      if (around.filter((j) => cells[j].flag).length !== c.n) return;
+      for (const j of around) {
+        if (ended) return;
+        open(j);
+      }
+    }
+    function toggleFlag(i) {
+      const c = cells[i];
+      if (c.open) return;
+      c.flag = !c.flag;
+      flags += c.flag ? 1 : -1;
+      q('left').textContent = M - flags;
+      draw(i);
+    }
+    function lose(i) {
+      ended = true;
+      T.clear();
+      cells.forEach((c, k) => {
+        if (c.mine) { c.open = true; draw(k); tds[k].classList.add('mine'); }
+      });
+      tds[i].classList.add('boom');
+      T.timeout(() => ctx.fail(loseMsg), 700);
+    }
+    function win() {
+      ended = true;
+      ctx.finish(Math.round((now() - t0) / 100) / 10);
+    }
+    table.addEventListener('click', (e) => {
+      const td = e.target.closest('td[data-i]');
+      if (!td || ended || ctx.paused()) return;
+      const i = +td.dataset.i;
+      if (cells[i].open) return chord(i);
+      flagMode ? toggleFlag(i) : open(i);
+    });
+    table.addEventListener('contextmenu', (e) => {
+      const td = e.target.closest('td[data-i]');
+      if (!td) return;
+      e.preventDefault();
+      if (!ended && !ctx.paused()) toggleFlag(+td.dataset.i);
+    });
+    q('mode').addEventListener('click', () => {
+      flagMode = !flagMode;
+      q('mode').textContent = '표시 모드: ' + (flagMode ? 'ON' : 'OFF');
+      q('mode').classList.toggle('primary', flagMode);
+    });
+    return { destroy: T.clear };
+  }
+
   /* ------------------------------------------------------------------
    * WK-102 리스크 점검 (지뢰찾기)
    * ------------------------------------------------------------------ */
@@ -186,121 +305,7 @@ window.WP_GAMES = [];
     higher: false,
     fmt: sec1,
     mount(root, ctx) {
-      const T = timers();
-      const W = 9, H = 9, M = 10;
-      const cells = Array.from({ length: W * H }, () => ({ mine: false, n: 0, open: false, flag: false }));
-      let started = false, ended = false, t0 = 0, revealed = 0, flags = 0, flagMode = false;
-      const cols = 'ABCDEFGHI'.split('');
-      root.innerHTML = `
-        <div class="g-stats">
-          <span>잔여 리스크 <b data-k="left">${M}</b></span>
-          <span>경과 <b data-k="time">0.0초</b></span>
-          <button class="btn sm" data-k="mode">표시 모드: OFF</button>
-        </div>
-        <div class="sheet-wrap"><table class="sheet ms">
-          <thead><tr><th></th>${cols.map((c) => `<th>${c}</th>`).join('')}</tr></thead>
-          <tbody>${Array.from({ length: H }, (_, y) => `<tr><th>${y + 1}</th>${cols.map((_, x) => `<td data-i="${y * W + x}"></td>`).join('')}</tr>`).join('')}</tbody>
-        </table></div>`;
-      const q = (k) => root.querySelector(`[data-k="${k}"]`);
-      const tds = Array.from(root.querySelectorAll('td[data-i]'));
-      const table = root.querySelector('table');
-
-      function nb(i) {
-        const x = i % W, y = Math.floor(i / W), r = [];
-        for (let dy = -1; dy <= 1; dy++)
-          for (let dx = -1; dx <= 1; dx++) {
-            if (!dx && !dy) continue;
-            const nx = x + dx, ny = y + dy;
-            if (nx >= 0 && nx < W && ny >= 0 && ny < H) r.push(ny * W + nx);
-          }
-        return r;
-      }
-      function place(safe) {
-        const banned = new Set([safe, ...nb(safe)]);
-        let c = 0;
-        while (c < M) {
-          const i = rand(W * H);
-          if (banned.has(i) || cells[i].mine) continue;
-          cells[i].mine = true;
-          c++;
-        }
-        cells.forEach((cell, i) => (cell.n = nb(i).filter((j) => cells[j].mine).length));
-      }
-      function draw(i) {
-        const c = cells[i], td = tds[i];
-        td.className = c.open ? 'open n' + c.n : c.flag ? 'flag' : '';
-        td.textContent = c.open ? (c.mine ? '✱' : c.n || '') : c.flag ? '⚑' : '';
-      }
-      function open(i) {
-        const c = cells[i];
-        if (c.open || c.flag) return;
-        if (!started) {
-          started = true;
-          place(i);
-          t0 = now();
-          T.interval(() => (q('time').textContent = ((now() - t0) / 1000).toFixed(1) + '초'), 100);
-        }
-        if (c.mine) return lose(i);
-        const st = [i];
-        while (st.length) {
-          const k = st.pop(), d = cells[k];
-          if (d.open || d.flag) continue;
-          d.open = true;
-          revealed++;
-          draw(k);
-          if (d.n === 0) nb(k).forEach((j) => !cells[j].open && st.push(j));
-        }
-        if (revealed === W * H - M) win();
-      }
-      function chord(i) {
-        const c = cells[i];
-        const around = nb(i);
-        if (around.filter((j) => cells[j].flag).length !== c.n) return;
-        for (const j of around) {
-          if (ended) return;
-          open(j);
-        }
-      }
-      function toggleFlag(i) {
-        const c = cells[i];
-        if (c.open) return;
-        c.flag = !c.flag;
-        flags += c.flag ? 1 : -1;
-        q('left').textContent = M - flags;
-        draw(i);
-      }
-      function lose(i) {
-        ended = true;
-        T.clear();
-        cells.forEach((c, k) => {
-          if (c.mine) { c.open = true; draw(k); tds[k].classList.add('mine'); }
-        });
-        tds[i].classList.add('boom');
-        T.timeout(() => ctx.fail('리스크가 발생했습니다. 점검표를 다시 작성해 주세요.'), 700);
-      }
-      function win() {
-        ended = true;
-        ctx.finish(Math.round((now() - t0) / 100) / 10);
-      }
-      table.addEventListener('click', (e) => {
-        const td = e.target.closest('td[data-i]');
-        if (!td || ended || ctx.paused()) return;
-        const i = +td.dataset.i;
-        if (cells[i].open) return chord(i);
-        flagMode ? toggleFlag(i) : open(i);
-      });
-      table.addEventListener('contextmenu', (e) => {
-        const td = e.target.closest('td[data-i]');
-        if (!td) return;
-        e.preventDefault();
-        if (!ended && !ctx.paused()) toggleFlag(+td.dataset.i);
-      });
-      q('mode').addEventListener('click', () => {
-        flagMode = !flagMode;
-        q('mode').textContent = '표시 모드: ' + (flagMode ? 'ON' : 'OFF');
-        q('mode').classList.toggle('primary', flagMode);
-      });
-      return { destroy: T.clear };
+      return mountMines(root, ctx, { W: 9, H: 9, M: 10, loseMsg: '리스크가 발생했습니다. 점검표를 다시 작성해 주세요.' });
     },
   });
 
@@ -995,6 +1000,32 @@ window.WP_GAMES = [];
       });
       nextLevel();
       return { destroy: T.clear };
+    },
+  });
+
+  /* ------------------------------------------------------------------
+   * WK-111 전사 리스크 정밀 감사 (지뢰찾기 고급: 30×16, 99개)
+   * ------------------------------------------------------------------ */
+  G.push({
+    id: 'risk_hard',
+    code: 'WK-111',
+    title: '전사 리스크 정밀 감사',
+    short: '고위험 리스크 99건 정밀 감사 (고급)',
+    desc: '30×16 전사 감사표에 숨겨진 고위험 리스크 99건을 피해서 모든 항목을 감사합니다. 리스크 점검의 고급 과정입니다.',
+    howto: ['셀 클릭: 항목 감사 · 우클릭: 리스크 표시', '숫자는 주변 8칸에 있는 리스크 개수입니다', '확인된 숫자 클릭 시 주변 일괄 감사 · 좁은 화면에서는 감사표가 세로(16×30)로 바뀝니다'],
+    higher: false,
+    fmt: sec1,
+    wide: true, // 감사표가 넓어서 순위표를 아래로 내린 한 줄 레이아웃 사용
+    mount(root, ctx) {
+      // 가로 30칸이 들어가지 않는 화면이면 같은 난이도로 세로 배치
+      const wide = root.clientWidth >= 30 * 25 + 60;
+      return mountMines(root, ctx, {
+        W: wide ? 30 : 16,
+        H: wide ? 16 : 30,
+        M: 99,
+        hard: true,
+        loseMsg: '고위험 리스크가 터졌습니다. 정밀 감사를 처음부터 다시 진행해 주세요.',
+      });
     },
   });
 })();
