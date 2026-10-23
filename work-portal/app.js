@@ -38,12 +38,15 @@
   const byId = Object.fromEntries(GAMES.map((g) => [g.id, g]));
 
   const NO_GROUP = '무소속';
-  const getName = () => store.get('wp_name', '');
+  const DB = window.WP_DB;
+  let orgInfo = null; // 내 단체 정보 (org_info 결과). 단체 범위일 때 이름·그룹은 여기서 가져온다
+  const inOrg = () => DB.scope === 'org' && !!orgInfo;
+  const getName = () => (inOrg() ? orgInfo.me.name : store.get('wp_name', ''));
   function setName(n) {
     store.set('wp_name', n);
     renderUser();
   }
-  const getGroup = () => store.get('wp_group', '') || NO_GROUP;
+  const getGroup = () => (inOrg() ? orgInfo.me.group : store.get('wp_group', '') || NO_GROUP);
   function setGroup(gr) {
     store.set('wp_group', gr === NO_GROUP ? '' : gr);
     renderUser();
@@ -74,8 +77,6 @@
         </div>
         <label class="lbl" for="grInput">그룹명 <span class="muted">(선택 · 미입력 시 무소속)</span></label>
         <input class="inp full" id="grInput" maxlength="20" autocomplete="off" placeholder="예) 개발1팀, 3층 탕비실파" value="${esc(getGroup() === NO_GROUP ? '' : getGroup())}" />`;
-
-  const DB = window.WP_DB;
 
   const today = () => new Date().toISOString().slice(0, 10);
   function countPlay() {
@@ -115,6 +116,7 @@
       `<a href="#/" data-nav=""><span class="nav-ico">▦</span>대시보드</a>`,
       `<a href="#/ranking" data-nav="ranking"><span class="nav-ico">▲</span>실적 현황</a>`,
       `<a href="#/groups" data-nav="groups"><span class="nav-ico">⚑</span>그룹 대항전</a>`,
+      `<a href="#/org" data-nav="org"><span class="nav-ico">◆</span>단체</a>`,
       `<div class="nav-sec">업무 모듈</div>`,
       ...GAMES.map((g) => `<a href="#/game/${g.id}" data-nav="game/${g.id}"><span class="nav-code">${g.code.slice(3)}</span>${g.title}</a>`),
     ];
@@ -126,7 +128,7 @@
   function renderUser() {
     const n = getName();
     $('#userName').textContent = n || '게스트';
-    $('#userGroup').textContent = getGroup();
+    $('#userGroup').textContent = inOrg() ? `${orgInfo.org_name} · ${getGroup()}` : getGroup();
     $('#avatar').textContent = n ? n.trim().split(' ').pop()[0] : '?';
   }
   function tickClock() {
@@ -534,6 +536,7 @@
   }
 
   function showResult(g, score, session) {
+    const org = DB.scope === 'org'; // 단체 범위면 단체 멤버 이름·그룹으로 단체 순위에 등록
     openModal(
       `<div class="modal-h">업무 처리 완료 보고</div>
       <div class="modal-b">
@@ -542,7 +545,7 @@
           <tr><th>처리 실적</th><td class="result">${g.fmt(score)}</td></tr>
           <tr><th>예상 순위</th><td id="mRank"><span class="muted">조회 중…</span></td></tr>
         </table>
-        ${profileFields()}
+        ${org ? orgNote() : profileFields()}
         <p class="form-err hidden" id="mErr"></p>
       </div>
       <div class="modal-f">
@@ -552,19 +555,21 @@
       () => renderIntro(g, g.fmt(score))
     );
     const inp = $('#nmInput');
-    $('#nmRand').addEventListener('click', () => {
-      inp.value = randomName();
-      inp.focus();
-    });
+    if (!org) {
+      $('#nmRand').addEventListener('click', () => {
+        inp.value = randomName();
+        inp.focus();
+      });
+    }
     $('#mSkip').addEventListener('click', closeModal);
     fill('#mRank', DB.rankOf(g, score), (pr) => `<b>${pr.rank}위</b> <span class="muted">/ ${pr.total}건</span>`, () => '<span class="muted">-</span>');
     let saving = false;
     const save = async () => {
       if (saving) return;
       const err = $('#mErr');
-      const name = inp.value.trim().slice(0, 16) || randomName();
-      const group = cleanGroup($('#grInput').value);
-      const bad = profileError(name, group);
+      const name = org ? (orgInfo ? orgInfo.me.name : '') : inp.value.trim().slice(0, 16) || randomName();
+      const group = org ? (orgInfo ? orgInfo.me.group : '') : cleanGroup($('#grInput').value);
+      const bad = org ? '' : profileError(name, group);
       if (bad) {
         err.textContent = bad;
         err.classList.remove('hidden');
@@ -574,9 +579,11 @@
       const btn = $('#mSave');
       btn.disabled = $('#mSkip').disabled = true;
       btn.textContent = '등록 중…';
-      setName(name);
-      setGroup(group);
-      inp.value = name;
+      if (!org) {
+        setName(name);
+        setGroup(group);
+        inp.value = name;
+      }
       try {
         const r = await DB.add(g, name, group, score, await session);
         DB.track('record', g.id);
@@ -592,13 +599,23 @@
       }
     };
     $('#mSave').addEventListener('click', save);
-    [inp, $('#grInput')].forEach((el) =>
-      el.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.isComposing) save();
-      })
-    );
+    if (!org) {
+      [inp, $('#grInput')].forEach((el) =>
+        el.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && !e.isComposing) save();
+        })
+      );
+    }
     setTimeout(() => $('#mSave').focus(), 0);
   }
+
+  // 단체 범위에서 실적 등록 창에 보여줄 안내
+  const orgNote = () =>
+    !orgInfo
+      ? '<div class="org-note">🏢 내 단체 순위에 등록됩니다. <div class="muted sm">단체 기록은 단체 멤버만 볼 수 있습니다.</div></div>'
+      : `
+        <div class="org-note">🏢 <b>${esc(orgInfo.org_name)}</b> 단체 순위에 <b>${esc(orgInfo.me.name)}</b> ${groupTag(orgInfo.me.group)}(으)로 등록됩니다.
+          <div class="muted sm">단체 기록은 단체 멤버만 볼 수 있습니다. 이름·그룹은 [단체] 메뉴에서 바꿀 수 있습니다.</div></div>`;
 
   function showFail(g, msg) {
     openModal(
@@ -618,6 +635,7 @@
   }
 
   function openNameModal() {
+    if (inOrg()) return openOrgProfileModal();
     openModal(
       `<div class="modal-h">사용자 설정</div>
       <div class="modal-b">
@@ -666,6 +684,421 @@
     t.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+  }
+
+  /* ---------------- 단체 ---------------- */
+  // 저장된 단체 토큰으로 단체 정보를 불러온다. 내보내진 경우 이 브라우저의 단체 정보를 지운다.
+  function loadOrg() {
+    if (!DB.org.joined || !DB.org.available) {
+      orgInfo = null;
+      renderScope();
+      return Promise.resolve();
+    }
+    return DB.org
+      .info()
+      .then(
+        (info) => {
+          orgInfo = info;
+        },
+        (e) => {
+          orgInfo = null;
+          if (e.code === 'not_member') {
+            DB.org.forget();
+            toast('단체에서 나가진 상태입니다. 전체 기록 보기로 돌아갑니다.');
+          } else if (DB.scope === 'org') {
+            // 단체 정보를 못 불러오면 이름·범위가 어긋나지 않게 전체 보기로 돌린다
+            DB.setScope('public');
+            toast('단체 정보를 불러오지 못해 전체 기록으로 표시합니다.');
+          }
+        }
+      )
+      .then(() => {
+        renderUser();
+        renderScope();
+      });
+  }
+
+  function renderScope() {
+    const el = $('#scopeSeg');
+    if (!orgInfo || !DB.org.joined) {
+      el.classList.add('hidden');
+      el.innerHTML = '';
+      return;
+    }
+    el.classList.remove('hidden');
+    el.innerHTML = `<button data-s="public" class="${DB.scope === 'public' ? 'on' : ''}">전체</button><button data-s="org" class="${DB.scope === 'org' ? 'on' : ''}" title="${esc(orgInfo.org_name)} 단체 기록">🏢 ${esc(orgInfo.org_name)}</button>`;
+  }
+
+  function switchScope(s) {
+    if (current) return toast('진행 중인 업무를 마친 뒤 전환해 주세요.');
+    if (s === DB.scope) return;
+    DB.setScope(s);
+    renderScope();
+    renderUser();
+    route();
+    toast(s === 'org' ? `🏢 ${esc(orgInfo.org_name)} 단체 기록 보기` : '전체 기록 보기');
+  }
+
+  const orgErr = (sel, e) => {
+    const el = $(sel);
+    if (!el) return toast(esc(e.message));
+    el.textContent = e.friendly ? e.message : '처리하지 못했습니다. 잠시 후 다시 시도해 주세요. (' + e.message + ')';
+    el.classList.remove('hidden');
+  };
+  const copyText = (text, input) => {
+    const done = () => toast('복사했습니다');
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, () => input && input.select());
+    else if (input) input.select();
+  };
+  // 단체 화면 항목별 도움말 (상단 [도움말 숨기기]로 접을 수 있다)
+  const ORG_HELP = {
+    join: '단체 관리자에게 받은 8자리 초대 코드로 가입합니다. 가입하면 이 브라우저에 멤버 정보가 저장되어, 다음부터는 바로 단체 기록을 볼 수 있습니다.',
+    ojCode: '대소문자·하이픈(-)은 상관없습니다. 코드가 맞지 않으면 관리자에게 최신 코드를 다시 받아 주세요. (관리자가 재발급하면 옛 코드는 쓸 수 없습니다)',
+    ojName: '단체 순위에 표시될 이름입니다. 전체 순위용 이름과 따로 정할 수 있고, 가입한 뒤에도 바꿀 수 있습니다.',
+    create: '새 단체를 만들면 만든 사람이 관리자가 되어 그룹을 만들고 멤버를 관리합니다. 만든 직후 초대 코드와 관리자 코드가 표시됩니다.',
+    ocName: '멤버들이 보게 될 단체 이름입니다. (최대 30자)',
+    ocMe: '이 단체 안에서 쓸 내 이름입니다.',
+    scope: '단체 기록: 순위표·실적 현황·그룹 대항전·기록 등록이 모두 이 단체 멤버끼리만 공유됩니다. 전체 기록: 누구나 보는 공개 순위입니다. 화면 위쪽 [전체 | 🏢 단체명] 버튼으로도 바꿀 수 있습니다.',
+    omName: '단체 순위에 표시될 이름입니다. 단체 기록을 등록하면 이 이름으로 올라갑니다.',
+    omGroup: '관리자가 만든 그룹 중에서 고릅니다. 그룹 대항전과 순위표의 [내 그룹] 보기에 쓰입니다. 원하는 그룹이 없으면 관리자에게 요청하세요.',
+    omAdmin: '단체를 만들 때 받은 관리자 코드를 넣으면 이 기기에서도 관리자 메뉴를 쓸 수 있습니다. 관리자 코드를 알려준 사람도 관리자가 될 수 있으니 주의하세요.',
+    omLeave: '나가면 이 브라우저의 멤버 정보가 지워집니다. 이미 등록한 기록은 단체 순위에 남고, 다시 들어오려면 초대 코드가 필요합니다.',
+    oaInv: '이 코드를 멤버에게 알려주면 [단체] 메뉴에서 가입할 수 있습니다. 코드를 아는 사람은 누구나 가입할 수 있으니, 원치 않는 곳에 퍼졌다면 [재발급]을 누르세요. 기존 멤버는 그대로 남습니다.',
+    oaGroup: '멤버가 고를 수 있는 그룹 목록입니다 (최대 50개). 그룹을 지우면 그 그룹 멤버는 무소속이 되지만, 이미 등록된 기록의 그룹명은 그대로입니다.',
+    oaMembers: '단체에 가입한 사람 목록입니다. [내보내기]를 누르면 그 사람은 더 이상 단체 기록을 볼 수 없습니다. 이미 등록한 기록은 단체 순위에 남습니다.',
+  };
+  const help = (k) => `<p class="help">💡 ${ORG_HELP[k]}</p>`;
+  const helpOff = () => store.get('wp_org_help', 'on') === 'off';
+  function applyHelpPref() {
+    document.body.classList.toggle('help-off', helpOff());
+    const b = $('[data-orghelp="toggle"]');
+    if (b) b.textContent = helpOff() ? '💡 도움말 보기' : '💡 도움말 숨기기';
+  }
+  const orgHead = (sub) => `
+      <div class="page-head">
+        <div>
+          <div class="crumb">홈 › 단체</div>
+          <h1>단체</h1>
+          <p class="sub">${sub}</p>
+        </div>
+        <div class="head-actions">
+          <button class="btn sm" data-orghelp="intro">단체 모드 안내</button>
+          <button class="btn sm" data-orghelp="toggle">${helpOff() ? '💡 도움말 보기' : '💡 도움말 숨기기'}</button>
+        </div>
+      </div>`;
+
+  // 단체 모드 안내 (첫 방문 시 한 번 자동 표시, [단체 모드 안내] 버튼으로 다시 보기)
+  function showOrgIntro() {
+    store.set('wp_org_intro_seen', 1);
+    const onOrgPage = location.hash === '#/org';
+    openModal(
+      `<div class="modal-h">🏢 단체 모드 안내</div>
+      <div class="modal-b intro-modal">
+        <p>단체 모드는 <b>회사·팀·모임끼리만 보는 비공개 순위</b>입니다. 단체에서 등록한 기록은 전체 순위에 나오지 않고, 같은 단체 멤버만 볼 수 있습니다.</p>
+        <ol class="intro-steps">
+          <li><b>단체 만들기 또는 가입</b><span>왼쪽 [◆ 단체] 메뉴에서 새 단체를 만들거나, 관리자에게 받은 초대 코드로 가입합니다.</span></li>
+          <li><b>이름·그룹 정하기</b><span>단체에서 쓸 이름과, 관리자가 만든 그룹 중 내 그룹을 고릅니다.</span></li>
+          <li><b>보기 전환</b><span>화면 위쪽 <span class="kbd">전체</span> <span class="kbd">🏢 단체명</span> 버튼으로 바꿉니다. 단체로 바꾸면 순위표·실적 현황·그룹 대항전·기록 등록이 단체 안에서만 동작합니다.</span></li>
+          <li><b>관리자</b><span>단체를 만든 사람은 그룹 관리, 멤버 내보내기, 초대 코드 재발급을 할 수 있습니다.</span></li>
+        </ol>
+        <p class="muted sm">로그인 없이 이 브라우저에 멤버 정보가 저장됩니다. 다른 기기에서는 초대 코드로 다시 가입하면 됩니다.</p>
+      </div>
+      <div class="modal-f"><button class="btn" id="oiClose">닫기</button>${onOrgPage ? '' : '<button class="btn primary" id="oiGo">단체 메뉴로 이동</button>'}</div>`,
+      null
+    );
+    $('#oiClose').addEventListener('click', closeModal);
+    if (!onOrgPage) {
+      $('#oiGo').addEventListener('click', () => {
+        closeModal();
+        location.hash = '#/org';
+      });
+    }
+  }
+
+  function renderOrg() {
+    if (!DB.org.available) {
+      main.innerHTML = orgHead('단체 기능은 공유 서버에 연결되어 있을 때만 쓸 수 있습니다.');
+      return;
+    }
+    if (!DB.org.joined) return renderOrgJoin();
+    main.innerHTML = orgHead('단체 멤버끼리만 보는 비공개 순위입니다. 단체 기록은 전체 순위에 나오지 않습니다.') + `<div id="orgBody">${LOADING}</div>`;
+    const seq = viewSeq;
+    DB.org.info().then(
+      (info) => {
+        if (seq !== viewSeq) return;
+        orgInfo = info;
+        renderUser();
+        renderScope();
+        drawOrg();
+      },
+      (e) => {
+        if (seq !== viewSeq) return;
+        if (e.code === 'not_member') {
+          DB.org.forget();
+          orgInfo = null;
+          renderUser();
+          renderScope();
+          toast(esc(e.message));
+          return renderOrgJoin();
+        }
+        $('#orgBody').innerHTML = errHTML(e);
+      }
+    );
+  }
+
+  function renderOrgJoin() {
+    main.innerHTML =
+      orgHead('단체를 만들거나 초대 코드로 가입하면, 단체 멤버끼리만 보는 비공개 순위를 쓸 수 있습니다.') +
+      `
+      <div class="org-grid">
+        <section class="panel">
+          <div class="panel-h"><span>초대 코드로 가입</span></div>
+          <div class="panel-b">
+            ${help('join')}
+            <label class="lbl" for="ojCode">초대 코드</label>
+            <input class="inp full code" id="ojCode" maxlength="9" autocomplete="off" placeholder="예) ABCD-EFGH" />
+            ${help('ojCode')}
+            <label class="lbl" for="ojName">단체에서 쓸 이름</label>
+            <input class="inp full" id="ojName" maxlength="16" autocomplete="off" value="${esc(getName())}" placeholder="예) ${esc(randomName())}" />
+            ${help('ojName')}
+            <p class="form-err hidden" id="ojErr"></p>
+            <div class="org-actions"><button class="btn primary" id="ojBtn">가입하기</button></div>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-h"><span>새 단체 만들기</span></div>
+          <div class="panel-b">
+            ${help('create')}
+            <label class="lbl" for="ocName">단체 이름</label>
+            <input class="inp full" id="ocName" maxlength="30" autocomplete="off" placeholder="예) ○○주식회사, 3층 개발본부" />
+            ${help('ocName')}
+            <label class="lbl" for="ocMe">내 이름</label>
+            <input class="inp full" id="ocMe" maxlength="16" autocomplete="off" value="${esc(getName())}" placeholder="예) ${esc(randomName())}" />
+            ${help('ocMe')}
+            <p class="form-err hidden" id="ocErr"></p>
+            <div class="org-actions"><button class="btn" id="ocBtn">단체 만들기</button></div>
+          </div>
+        </section>
+      </div>`;
+    const busy = (btn, on, label) => {
+      btn.disabled = on;
+      btn.textContent = on ? '처리 중…' : label;
+    };
+    $('#ojBtn').addEventListener('click', () => {
+      const code = $('#ojCode').value.trim().toUpperCase();
+      const name = $('#ojName').value.trim().slice(0, 16) || randomName();
+      if (!/^[A-Z0-9]{4}-?[A-Z0-9]{4}$/.test(code)) return orgErr('#ojErr', { friendly: true, message: '초대 코드 8자리를 입력해 주세요. (예: ABCD-EFGH)' });
+      if (profileError(name, '')) return orgErr('#ojErr', { friendly: true, message: profileError(name, '') });
+      const btn = $('#ojBtn');
+      busy(btn, true);
+      DB.org
+        .join(code.includes('-') ? code : code.slice(0, 4) + '-' + code.slice(4), name)
+        .then((r) => loadOrg().then(() => {
+          toast(`🏢 ${esc(r.org_name)} 단체에 가입했습니다`);
+          route();
+        }))
+        .catch((e) => {
+          busy(btn, false, '가입하기');
+          orgErr('#ojErr', e);
+        });
+    });
+    $('#ocBtn').addEventListener('click', () => {
+      const orgName = $('#ocName').value.trim().slice(0, 30);
+      const me = $('#ocMe').value.trim().slice(0, 16) || randomName();
+      if (!orgName) return orgErr('#ocErr', { friendly: true, message: '단체 이름을 입력해 주세요.' });
+      const bad = profileError(orgName, me);
+      if (bad) return orgErr('#ocErr', { friendly: true, message: bad });
+      const btn = $('#ocBtn');
+      busy(btn, true);
+      DB.org
+        .create(orgName, me)
+        .then((r) => loadOrg().then(() => showOrgCodes(r)))
+        .catch((e) => {
+          busy(btn, false, '단체 만들기');
+          orgErr('#ocErr', e);
+        });
+    });
+  }
+
+  // 단체를 만든 직후 초대 코드 / 관리자 코드 안내 (관리자 코드는 이때 한 번만 보여준다)
+  function showOrgCodes(r) {
+    openModal(
+      `<div class="modal-h">단체가 만들어졌습니다</div>
+      <div class="modal-b">
+        <p>🏢 <b>${esc(r.org_name)}</b></p>
+        <label class="lbl">초대 코드 <span class="muted">(멤버에게 공유)</span></label>
+        <div class="row"><input class="inp code" id="ccInv" readonly value="${esc(r.invite_code)}" /><button class="btn" id="ccInvCopy">복사</button></div>
+        <label class="lbl">관리자 코드 <span class="muted">(본인만 보관)</span></label>
+        <div class="row"><input class="inp code" id="ccAdm" readonly value="${esc(r.admin_code)}" /><button class="btn" id="ccAdmCopy">복사</button></div>
+        <p class="form-err">⚠ 관리자 코드는 지금 한 번만 보여드립니다. 다른 기기·브라우저에서 관리자 권한을 받을 때 필요하니 꼭 따로 저장해 두세요.</p>
+      </div>
+      <div class="modal-f"><button class="btn primary" id="ccOk">확인</button></div>`,
+      () => route()
+    );
+    $('#ccInvCopy').addEventListener('click', () => copyText(r.invite_code, $('#ccInv')));
+    $('#ccAdmCopy').addEventListener('click', () => copyText(r.admin_code, $('#ccAdm')));
+    $('#ccOk').addEventListener('click', closeModal);
+  }
+
+  function drawOrg() {
+    const info = orgInfo;
+    const me = info.me;
+    const groupOptions = [NO_GROUP, ...info.groups].map((gr) => `<option value="${esc(gr)}"${gr === me.group ? ' selected' : ''}>${esc(gr)}</option>`).join('');
+    $('#orgBody').innerHTML = `
+      <div class="org-grid">
+        <section class="panel">
+          <div class="panel-h"><span>🏢 ${esc(info.org_name)}</span><span class="muted sm">멤버 ${info.members}명${me.is_admin ? ' · <span class="badge">관리자</span>' : ''}</span></div>
+          <div class="panel-b">
+            <div class="org-scope">현재 보기: <b>${DB.scope === 'org' ? '단체 기록' : '전체 기록'}</b>
+              <button class="btn sm${DB.scope === 'org' ? '' : ' primary'}" data-scope="${DB.scope === 'org' ? 'public' : 'org'}">${DB.scope === 'org' ? '전체 기록 보기' : '단체 기록 보기'}</button></div>
+            ${help('scope')}
+            <label class="lbl" for="omName">단체에서 쓸 이름</label>
+            <input class="inp full" id="omName" maxlength="16" autocomplete="off" value="${esc(me.name)}" />
+            ${help('omName')}
+            <label class="lbl" for="omGroup">그룹</label>
+            <select class="inp full" id="omGroup">${groupOptions}</select>
+            ${help('omGroup')}
+            ${info.groups.length ? '' : '<p class="muted sm">아직 그룹이 없습니다. 관리자가 그룹을 만들면 고를 수 있습니다.</p>'}
+            <p class="form-err hidden" id="omErr"></p>
+            <div class="org-actions"><button class="btn primary" id="omSave">저장</button></div>
+            ${me.is_admin ? '' : `
+            <label class="lbl" for="omAdmin">관리자 코드가 있다면</label>
+            <div class="row"><input class="inp code" id="omAdmin" maxlength="14" autocomplete="off" placeholder="XXXX-XXXX-XXXX" /><button class="btn" id="omClaim">관리자 권한 받기</button></div>
+            ${help('omAdmin')}
+            <p class="form-err hidden" id="omAdminErr"></p>`}
+            <div class="org-leave"><button class="btn danger sm" id="omLeave">단체 나가기</button>${help('omLeave')}</div>
+          </div>
+        </section>
+        ${me.is_admin ? `
+        <section class="panel">
+          <div class="panel-h"><span>관리자 메뉴</span></div>
+          <div class="panel-b">
+            <label class="lbl">초대 코드</label>
+            <div class="row"><input class="inp code" id="oaInv" readonly value="${esc(info.invite_code || '')}" /><button class="btn" id="oaCopy">복사</button><button class="btn" id="oaReset">재발급</button></div>
+            ${help('oaInv')}
+            <label class="lbl">그룹 관리</label>
+            <div class="org-chips">${info.groups.map((gr) => `<span class="chip">${esc(gr)}<button title="삭제" data-delgroup="${esc(gr)}">×</button></span>`).join('') || '<span class="muted sm">그룹이 없습니다.</span>'}</div>
+            <div class="row"><input class="inp" id="oaGroup" maxlength="20" autocomplete="off" placeholder="새 그룹명 (예: 개발1팀)" /><button class="btn" id="oaAdd">추가</button></div>
+            ${help('oaGroup')}
+            <p class="form-err hidden" id="oaErr"></p>
+            <label class="lbl">멤버</label>
+            ${help('oaMembers')}
+            <div id="oaMembers">${LOADING}</div>
+          </div>
+        </section>` : ''}
+      </div>`;
+
+    const refresh = (r) => {
+      orgInfo = r;
+      renderUser();
+      renderScope();
+      drawOrg();
+    };
+    $('#omSave').addEventListener('click', () => {
+      const name = $('#omName').value.trim().slice(0, 16);
+      if (!name) return orgErr('#omErr', { friendly: true, message: '이름을 입력해 주세요.' });
+      if (profileError(name, '')) return orgErr('#omErr', { friendly: true, message: profileError(name, '') });
+      DB.org.updateMe(name, $('#omGroup').value).then((r) => {
+        refresh(r);
+        toast('단체 정보를 저장했습니다');
+      }, (e) => orgErr('#omErr', e));
+    });
+    if (!me.is_admin) {
+      $('#omClaim').addEventListener('click', () => {
+        DB.org.claimAdmin($('#omAdmin').value).then((r) => {
+          refresh(r);
+          toast('관리자 권한을 받았습니다');
+        }, (e) => orgErr('#omAdminErr', e));
+      });
+    }
+    $('#omLeave').addEventListener('click', () => {
+      if (!confirm(`${info.org_name} 단체에서 나갈까요?\n다시 들어오려면 초대 코드가 필요합니다.${me.is_admin ? '\n관리자 코드가 없으면 관리자 권한도 다시 받을 수 없습니다.' : ''}`)) return;
+      DB.org.leave().then(() => {
+        orgInfo = null;
+        renderUser();
+        renderScope();
+        toast('단체에서 나갔습니다');
+        route();
+      }, (e) => orgErr('#omErr', e));
+    });
+    if (!me.is_admin) return;
+
+    $('#oaCopy').addEventListener('click', () => copyText(info.invite_code, $('#oaInv')));
+    $('#oaReset').addEventListener('click', () => {
+      if (!confirm('초대 코드를 새로 만들까요?\n기존 코드로는 더 이상 가입할 수 없습니다.')) return;
+      DB.org.resetInvite().then((r) => {
+        refresh(r);
+        toast('초대 코드를 재발급했습니다');
+      }, (e) => orgErr('#oaErr', e));
+    });
+    $('#oaAdd').addEventListener('click', () => {
+      const name = $('#oaGroup').value.trim().slice(0, 20);
+      if (!name) return;
+      if (profileError('', name)) return orgErr('#oaErr', { friendly: true, message: profileError('', name) });
+      DB.org.groupAdd(name).then(refresh, (e) => orgErr('#oaErr', e));
+    });
+    $('#oaGroup').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.isComposing) $('#oaAdd').click();
+    });
+    $('#orgBody').querySelectorAll('[data-delgroup]').forEach((b) =>
+      b.addEventListener('click', () => {
+        const name = b.dataset.delgroup;
+        if (!confirm(`'${name}' 그룹을 삭제할까요?\n이 그룹 멤버는 무소속이 됩니다. 이미 등록된 기록의 그룹명은 그대로입니다.`)) return;
+        DB.org.groupRemove(name).then(refresh, (e) => orgErr('#oaErr', e));
+      })
+    );
+    const drawMembers = (list) => {
+      const el = $('#oaMembers');
+      if (!el) return;
+      el.innerHTML = `<div class="scroll-x"><table class="tbl"><thead><tr><th>이름</th><th>그룹</th><th class="r">기록</th><th class="hide-sm">최근 접속</th><th></th></tr></thead><tbody>${list
+        .map(
+          (m) => `<tr><td class="wrap">${esc(m.name)}${m.is_admin ? ' <span class="badge">관리자</span>' : ''}${m.id === me.id ? ' <span class="muted sm">(나)</span>' : ''}</td><td>${groupTag(m.group)}</td><td class="r">${m.records}</td><td class="muted hide-sm">${fmtDate(Date.parse(m.last_seen))}</td><td class="r">${m.id === me.id ? '' : `<button class="btn sm danger" data-kick="${m.id}" data-name="${esc(m.name)}">내보내기</button>`}</td></tr>`
+        )
+        .join('')}</tbody></table></div>`;
+      el.querySelectorAll('[data-kick]').forEach((b) =>
+        b.addEventListener('click', () => {
+          if (!confirm(`${b.dataset.name} 님을 단체에서 내보낼까요?\n이미 등록된 기록은 단체 순위에 남습니다.`)) return;
+          DB.org.removeMember(+b.dataset.kick).then(drawMembers, (e) => orgErr('#oaErr', e));
+        })
+      );
+    };
+    const seq = viewSeq;
+    DB.org.members().then((list) => seq === viewSeq && drawMembers(list), (e) => seq === viewSeq && ($('#oaMembers').innerHTML = errHTML(e)));
+  }
+
+  // 단체 범위에서 우측 상단 사용자 칩을 누르면: 단체 이름·그룹 변경
+  function openOrgProfileModal() {
+    const me = orgInfo.me;
+    const groupOptions = [NO_GROUP, ...orgInfo.groups].map((gr) => `<option value="${esc(gr)}"${gr === me.group ? ' selected' : ''}>${esc(gr)}</option>`).join('');
+    openModal(
+      `<div class="modal-h">단체 사용자 설정</div>
+      <div class="modal-b">
+        <p>🏢 <b>${esc(orgInfo.org_name)}</b></p>
+        <label class="lbl" for="opName">단체에서 쓸 이름</label>
+        <input class="inp full" id="opName" maxlength="16" autocomplete="off" value="${esc(me.name)}" />
+        <label class="lbl" for="opGroup">그룹</label>
+        <select class="inp full" id="opGroup">${groupOptions}</select>
+        <p class="form-err hidden" id="opErr"></p>
+        <p class="muted sm">전체 순위용 이름은 상단에서 [전체]로 바꾼 뒤 설정할 수 있습니다.</p>
+      </div>
+      <div class="modal-f"><button class="btn" id="opCancel">취소</button><button class="btn primary" id="opSave">저장</button></div>`,
+      () => {
+        if (!current) route();
+      }
+    );
+    $('#opCancel').addEventListener('click', closeModal);
+    $('#opSave').addEventListener('click', () => {
+      const name = $('#opName').value.trim().slice(0, 16);
+      if (!name) return orgErr('#opErr', { friendly: true, message: '이름을 입력해 주세요.' });
+      if (profileError(name, '')) return orgErr('#opErr', { friendly: true, message: profileError(name, '') });
+      DB.org.updateMe(name, $('#opGroup').value).then((r) => {
+        orgInfo = r;
+        renderUser();
+        renderScope();
+        closeModal();
+        toast('단체 정보를 저장했습니다');
+      }, (e) => orgErr('#opErr', e));
+    });
   }
 
   /* ---------------- 보스 화면 (ESC) ---------------- */
@@ -723,9 +1156,18 @@
     } else if (view === 'groups') {
       setActiveNav('groups');
       renderGroups();
+    } else if (view === 'org') {
+      setActiveNav('org');
+      renderOrg();
     } else {
       setActiveNav('');
       renderDashboard();
+    }
+    if (view !== 'org' && inOrg()) {
+      main.insertAdjacentHTML(
+        'afterbegin',
+        `<div class="scope-banner">🏢 <b>${esc(orgInfo.org_name)}</b> 단체 기록을 보고 있습니다. 이 화면의 순위와 등록은 단체 멤버끼리만 공유됩니다. <button class="btn sm" data-scope="public">전체 기록 보기</button></div>`
+      );
     }
     window.scrollTo(0, 0);
   }
@@ -733,6 +1175,21 @@
   /* ---------------- 초기화 ---------------- */
   renderNav();
   renderUser();
+  $('#scopeSeg').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-s]');
+    if (b) switchScope(b.dataset.s);
+  });
+  main.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-scope]');
+    if (b) switchScope(b.dataset.scope);
+    const h = e.target.closest('[data-orghelp]');
+    if (h && h.dataset.orghelp === 'intro') showOrgIntro();
+    if (h && h.dataset.orghelp === 'toggle') {
+      store.set('wp_org_help', helpOff() ? 'on' : 'off');
+      applyHelpPref();
+    }
+  });
+  applyHelpPref();
   $('#dbMode').innerHTML = DB.mode === 'remote' ? '<span class="dot-on"></span>공유 서버 연결됨' : '<span class="dot-off"></span>로컬 저장 모드';
   buildBoss();
   tickClock();
@@ -749,7 +1206,18 @@
   $('#userChip').addEventListener('click', openNameModal);
   $('#menuBtn').addEventListener('click', () => document.body.classList.toggle('nav-open'));
   $('#scrim').addEventListener('click', () => document.body.classList.remove('nav-open'));
+  const scopeAtStart = DB.scope;
   route();
+  // 단체 정보를 불러온 뒤 단체 범위면(또는 범위가 바뀌었으면) 이름·그룹 표시를 위해 다시 그린다
+  loadOrg()
+    .then(() => {
+      if ((DB.scope === 'org' || DB.scope !== scopeAtStart) && !current && !modalOn) route();
+    })
+    // 첫 방문이면 단체 모드 안내를 한 번 띄운다 (서버에 단체 기능이 준비된 경우에만)
+    .then(() => (store.get('wp_org_intro_seen', 0) || DB.org.joined ? false : DB.org.ready()))
+    .then((ready) => {
+      if (ready && !modalOn && !current) showOrgIntro();
+    });
   // 방문 통계: 브라우저 탭(세션)당 한 번
   try {
     if (!sessionStorage.getItem('wp_visit')) {

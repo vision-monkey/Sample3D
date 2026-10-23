@@ -201,8 +201,152 @@
       all() {
         return get('select=*&order=created_at.desc&limit=5000');
       },
+      // 단체 기능에서 재사용
+      _rpc: rpc,
+      _norm: norm,
+      _friendly: friendly,
     };
   }
 
-  window.WP_DB = url && key ? remoteDB() : localDB();
+  /* ---------------- 단체 (supabase-org.sql) ---------------- */
+  const ORG_ERRORS = {
+    invalid_invite: '초대 코드가 올바르지 않습니다.',
+    not_member: '단체 멤버가 아닙니다. 탈퇴했거나 관리자가 내보냈을 수 있습니다.',
+    not_admin: '단체 관리자만 할 수 있습니다.',
+    invalid_admin_code: '관리자 코드가 올바르지 않습니다.',
+    invalid_group: '단체에 없는 그룹입니다.',
+    too_many_groups: '그룹은 최대 50개까지 만들 수 있습니다.',
+    org_full: '단체 인원이 가득 찼습니다 (최대 500명).',
+    cannot_remove_self: '자기 자신은 내보낼 수 없습니다. 단체 나가기를 이용하세요.',
+    bad_name: '사용할 수 없는 이름입니다. 비어 있거나 너무 길거나 금칙어가 들어 있습니다.',
+    rate_limited: '요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.',
+  };
+  const fail = (msg, extra) => Object.assign(new Error(msg), { friendly: true }, extra);
+  const orgError = (e) => {
+    if (ORG_ERRORS[e.message]) return fail(ORG_ERRORS[e.message], { code: e.message });
+    if (e.status === 404) return fail('단체 기능이 아직 준비되지 않았습니다. (supabase-org.sql 실행 필요)', { code: 'not_ready' });
+    return e;
+  };
+
+  // 단체 범위의 기록 저장소: 전체 공개 저장소와 같은 모양으로 동작한다
+  function orgDB(base, token) {
+    const call = (fn, body) => base._rpc(fn, Object.assign({ p_token: token }, body)).catch((e) => Promise.reject(orgError(e)));
+    const rows = (list) => (list || []).map(base._norm);
+    return {
+      top(g, limit, group) {
+        return call('org_top', { p_game: g.id, p_limit: limit, p_desc: g.higher, p_group: group || null }).then(rows);
+      },
+      async rankOf(g, score) {
+        const r = await call('org_rank', { p_game: g.id, p_score: score, p_desc: g.higher });
+        return { rank: r.better + 1, total: r.total + 1 };
+      },
+      // 이름·그룹은 서버의 멤버 정보로 등록된다
+      async add(g, name, group, score, session) {
+        const rank = await this.rankOf(g, score).then((r) => r.rank, () => null);
+        if (!session) throw fail('보안 확인을 시작하지 못했습니다. 새로고침 후 다시 플레이해 주세요.');
+        try {
+          const row = await base._rpc('submit_org_record', { p_session: session, p_token: token, p_score: score });
+          return { id: String(row.id), rank };
+        } catch (e) {
+          const oe = orgError(e);
+          throw oe.friendly ? oe : base._friendly(e);
+        }
+      },
+      recent(games, n) {
+        return call('org_recent', { p_limit: n }).then(rows);
+      },
+      total() {
+        return call('org_total', {});
+      },
+      all() {
+        return call('org_recent', { p_limit: 5000 }).then(rows);
+      },
+    };
+  }
+
+  const base = url && key ? remoteDB() : localDB();
+  const ls = {
+    get(k) {
+      try {
+        return localStorage.getItem(k);
+      } catch (e) {
+        return null;
+      }
+    },
+    set(k, v) {
+      try {
+        v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v);
+      } catch (e) { /* 저장 불가 환경은 무시 */ }
+    },
+  };
+  const token = () => ls.get('wp_org_token');
+  let scope = ls.get('wp_scope') === 'org' ? 'org' : 'public';
+  const active = () => (scope === 'org' && token() && base.mode === 'remote' ? orgDB(base, token()) : base);
+
+  const orgCall = (fn, body) => {
+    if (base.mode !== 'remote') return Promise.reject(fail('단체 기능은 공유 서버에 연결되어 있을 때만 쓸 수 있습니다.'));
+    return base._rpc(fn, body).catch((e) => Promise.reject(orgError(e)));
+  };
+  const withToken = (fn, body) => orgCall(fn, Object.assign({ p_token: token() }, body));
+  const saveToken = (r) => {
+    ls.set('wp_org_token', r.token);
+    scope = 'org';
+    ls.set('wp_scope', 'org');
+    return r;
+  };
+
+  const api = {
+    get mode() {
+      return base.mode;
+    },
+    // 'org' 이면 순위 조회·기록 등록이 내 단체 범위로 동작한다
+    get scope() {
+      return scope === 'org' && token() && base.mode === 'remote' ? 'org' : 'public';
+    },
+    setScope(s) {
+      scope = s === 'org' ? 'org' : 'public';
+      ls.set('wp_scope', scope);
+    },
+    startSession: (g) => base.startSession(g),
+    track: (kind, gameId) => base.track(kind, gameId),
+    org: {
+      get available() {
+        return base.mode === 'remote';
+      },
+      get joined() {
+        return !!token();
+      },
+      info: () => withToken('org_info', {}),
+      // 서버에 단체 기능(supabase-org.sql)이 있는지: 없는 토큰으로 물어서 not_member 면 준비된 것
+      ready: () => orgCall('org_info', { p_token: '' }).then(() => true, (e) => e.code === 'not_member'),
+      create: (name, member) => orgCall('org_create', { p_name: name, p_member_name: member }).then(saveToken),
+      join: (invite, member) => orgCall('org_join', { p_invite: invite, p_member_name: member }).then(saveToken),
+      updateMe: (name, group) => withToken('org_update_me', { p_name: name, p_group: group }),
+      claimAdmin: (code) => withToken('org_claim_admin', { p_admin_code: code }),
+      groupAdd: (name) => withToken('org_group_add', { p_name: name }),
+      groupRemove: (name) => withToken('org_group_remove', { p_name: name }),
+      members: () => withToken('org_member_list', {}),
+      removeMember: (id) => withToken('org_member_remove', { p_member_id: id }),
+      resetInvite: () => withToken('org_reset_invite', {}),
+      async leave() {
+        await withToken('org_leave', {}).catch((e) => {
+          if (e.code !== 'not_member') throw e;
+        });
+        api.org.forget();
+      },
+      // 이 브라우저의 단체 정보 삭제 (내보내졌을 때 등)
+      forget() {
+        ls.set('wp_org_token', null);
+        scope = 'public';
+        ls.set('wp_scope', 'public');
+      },
+    },
+  };
+  ['top', 'rankOf', 'add', 'recent', 'total', 'all'].forEach((k) => {
+    api[k] = (...args) => {
+      const d = active();
+      return d[k](...args);
+    };
+  });
+  window.WP_DB = api;
 })();

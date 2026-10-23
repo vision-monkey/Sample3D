@@ -73,6 +73,17 @@ WK-112(똥 피하기) 기록을 받으려면 SQL Editor에서 `supabase-dodge.sq
 
 WK-113(엑셀 틀린그림 찾기) 기록을 받으려면 SQL Editor에서 `supabase-diff.sql`을 한 번 실행하세요. 이전 게임 추가 SQL 내용도 모두 포함되어 있습니다.
 
+### 단체 (비공개 순위)
+
+SQL Editor에서 `supabase-org.sql`을 한 번 실행하면 [단체] 메뉴를 쓸 수 있습니다. 기존 기록은 그대로 전체 공개 순위에 남습니다.
+
+- **단체 만들기**: 초대 코드(멤버에게 공유)와 관리자 코드(본인 보관, 한 번만 표시)가 발급됩니다.
+- **가입**: 초대 코드를 아는 사람만 가입할 수 있습니다. 로그인 대신 브라우저에 멤버 토큰이 저장됩니다.
+- **관리자**: 그룹 추가/삭제, 멤버 목록·내보내기, 초대 코드 재발급. 다른 기기에서는 관리자 코드로 권한을 받습니다.
+- **보기 전환**: 상단 [전체 / 🏢 단체명]으로 바꾸면 순위표·실적 현황·그룹 대항전·기록 등록이 모두 단체 범위로 동작합니다.
+- 단체 기록은 전체 순위에 나오지 않으며, 단체 멤버만 볼 수 있습니다 (서버 함수가 멤버 토큰을 확인).
+- 앞으로 게임을 추가할 때는 `wp_games()`, `wp_score_ok()`, `records_game_chk` 세 곳만 고치면 됩니다.
+
 ## 동료와 같이 쓰기 (GitHub Pages)
 
 저장소 **Settings → Pages** → Source: `Deploy from a branch`, 브랜치 선택, 폴더 `/ (root)` → Save.
@@ -95,4 +106,5 @@ WK-113(엑셀 틀린그림 찾기) 기록을 받으려면 SQL Editor에서 `supa
 | `supabase-hard.sql` | 고급 지뢰찾기(risk_hard) 기록 허용 SQL |
 | `supabase-dodge.sql` | 업무 폭탄 회피(dodge) + 고급 지뢰찾기 기록 허용 SQL |
 | `supabase-diff.sql` | 데이터 정합성 검증(diff) + 이전 추가 게임 기록 허용 SQL |
+| `supabase-org.sql` | 단체(비공개 순위) 기능 SQL |
 | `privacy.html` | 개인정보처리방침 |
