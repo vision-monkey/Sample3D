@@ -1278,4 +1278,158 @@ window.WP_GAMES = [];
       };
     },
   });
+
+  /* ------------------------------------------------------------------
+   * WK-113 데이터 정합성 검증 (엑셀 틀린그림 찾기)
+   * ------------------------------------------------------------------ */
+  const DIFF_VENDORS = ['한빛상사', '대성물산', '세진유통', '미래테크', '동아산업', '우리식품', '태평양무역', '서울전자', '신화기계', '하나물류', '금강상회', '삼원정밀'];
+  const DIFF_ITEMS = ['A4 용지', '토너 카트리지', '모니터암', '무선 키보드', '사무용 의자', '높이조절 책상', '복합기', 'USB 허브', '노트북 거치대', '라벨 프린터', '파쇄기', '화이트보드'];
+  // 눈으로 헷갈리기 쉬운 글자 바꿈
+  const LOOKALIKE = {
+    상: '삼', 삼: '상', 사: '샤', 물: '뭍', 산: '신', 신: '산', 유: '우', 우: '유', 테: '태', 태: '테', 업: '엄', 식: '싁',
+    무: '뮤', 역: '억', 서: '셔', 울: '을', 전: '정', 정: '전', 화: '하', 하: '화', 기: '긱', 계: '게', 류: '루', 금: '굼',
+    강: '갈', 원: '윈', 용: '욤', 지: '자', 토: '투', 너: '나', 모: '무', 니: '나', 터: '타', 암: '얌', 키: '카',
+    보: '부', 드: '두', 자: '지', 책: '첵', 복: '봅', 합: '함', 허: '하', 브: '부', 북: '복', 거: '가', 치: '지',
+    대: '데', 라: '러', 벨: '빌', 린: '런', 파: '퍄', 쇄: '쉐', 판: '팬',
+  };
+  const DIFF_COLS = [
+    { key: 'vendor', label: '거래처', type: 'text' },
+    { key: 'item', label: '품목', type: 'text' },
+    { key: 'qty', label: '수량', type: 'num' },
+    { key: 'price', label: '단가', type: 'num' },
+    { key: 'amount', label: '금액', type: 'num' },
+  ];
+  const DIFF_ROUNDS = [5, 6, 7]; // 시트별 불일치 개수
+  const DIFF_ROWS = 8;
+  const DIFF_PENALTY = 3; // 오검출 1회당 +3초
+
+  function mutateText(v) {
+    const chars = [...v];
+    const idx = shuffle(chars.map((_, i) => i)).filter((i) => LOOKALIKE[chars[i]] && LOOKALIKE[chars[i]] !== chars[i]);
+    if (idx.length) {
+      chars[idx[0]] = LOOKALIKE[chars[idx[0]]];
+      return chars.join('');
+    }
+    // 바꿀 글자가 없으면 인접한 두 글자 순서 바꾸기
+    for (let i = 0; i < chars.length - 1; i++) {
+      if (chars[i] !== chars[i + 1] && chars[i] !== ' ' && chars[i + 1] !== ' ') {
+        [chars[i], chars[i + 1]] = [chars[i + 1], chars[i]];
+        return chars.join('');
+      }
+    }
+    return v + '.';
+  }
+  function mutateNum(n) {
+    const d = String(n).split('');
+    // 인접 자릿수 뒤바뀜 (1250 → 1520) 우선, 안 되면 한 자리 ±1
+    const swaps = shuffle(d.map((_, i) => i).slice(0, -1)).filter((i) => d[i] !== d[i + 1] && !(i === 0 && d[i + 1] === '0'));
+    if (swaps.length && Math.random() < 0.6) {
+      const i = swaps[0];
+      [d[i], d[i + 1]] = [d[i + 1], d[i]];
+    } else {
+      const i = rand(d.length);
+      const cur = +d[i];
+      let nv = cur + (Math.random() < 0.5 ? 1 : -1);
+      if (nv < 0 || nv > 9 || (i === 0 && nv === 0)) nv = cur === 9 ? 8 : cur + 1;
+      d[i] = String(nv);
+    }
+    return +d.join('');
+  }
+  const fmtCell = (col, v) => (col.type === 'num' ? Number(v).toLocaleString() : v);
+
+  G.push({
+    id: 'diff',
+    code: 'WK-113',
+    title: '데이터 정합성 검증',
+    short: '원본·사본 시트의 불일치 데이터 찾기',
+    desc: '원본 시트와 사본 시트를 대조해 값이 다른 셀을 찾아냅니다. 3개 시트, 총 18건의 불일치를 찾는 시간이 실적입니다.',
+    howto: ['오른쪽(사본) 시트에서 원본과 다른 셀을 클릭', '숫자 자리 바뀜, 비슷한 글자 오타 등 미세한 차이를 찾으세요', `잘못 클릭하면 ${DIFF_PENALTY}초 패널티 · 3개 시트를 모두 검증하면 완료`],
+    higher: false,
+    fmt: sec1,
+    wide: true,
+    mount(root, ctx) {
+      const T = timers();
+      let round = 0, found = 0, wrong = 0, diffs = null, done = false;
+      const t0 = now();
+      const elapsed = () => (now() - t0) / 1000 + wrong * DIFF_PENALTY;
+      root.innerHTML = `
+        <div class="g-stats">
+          <span>검증 시트 <b data-k="round">1 / ${DIFF_ROUNDS.length}</b></span>
+          <span>남은 불일치 <b data-k="left">-</b>건</span>
+          <span>경과 <b data-k="time">0.0초</b></span>
+          <span>오검출 <b data-k="wrong">0</b>건 (+${DIFF_PENALTY}초)</span>
+        </div>
+        <div class="diff-wrap">
+          <div class="diff-pane"><div class="diff-cap"><span class="badge gray">원본</span> ERP_매입내역_원본.xlsx</div><div data-k="src"></div></div>
+          <div class="diff-pane"><div class="diff-cap"><span class="badge">사본</span> 매입내역_취합본_최종.xlsx <span class="muted sm">← 여기서 클릭</span></div><div data-k="dst"></div></div>
+        </div>`;
+      const q = (k) => root.querySelector(`[data-k="${k}"]`);
+
+      function makeRows() {
+        const vendors = shuffle(DIFF_VENDORS), items = shuffle(DIFF_ITEMS);
+        return Array.from({ length: DIFF_ROWS }, (_, i) => {
+          const qty = 1 + rand(240);
+          const price = (10 + rand(9890)) * 100;
+          return { vendor: vendors[i], item: items[i], qty, price, amount: qty * price };
+        });
+      }
+      function table(rows, side) {
+        const cells = rows
+          .map(
+            (r, y) =>
+              `<tr><th>${y + 2}</th>${DIFF_COLS.map((c, x) => `<td class="${c.type === 'num' ? 'r' : ''}" data-c="${y}-${x}">${fmtCell(c, r[c.key])}</td>`).join('')}</tr>`
+          )
+          .join('');
+        return `<table class="diff-sheet ${side}">
+          <thead><tr><th></th>${DIFF_COLS.map((_, x) => `<th>${String.fromCharCode(65 + x)}</th>`).join('')}</tr>
+          <tr class="hdr"><th>1</th>${DIFF_COLS.map((c) => `<td>${c.label}</td>`).join('')}</tr></thead>
+          <tbody>${cells}</tbody></table>`;
+      }
+      function startRound() {
+        const src = makeRows();
+        const dst = src.map((r) => ({ ...r }));
+        const n = DIFF_ROUNDS[round];
+        // 행과 열이 고르게 섞이도록 서로 다른 셀 n개 선택
+        const picks = shuffle(Array.from({ length: DIFF_ROWS * DIFF_COLS.length }, (_, i) => i)).slice(0, n);
+        diffs = new Set();
+        for (const p of picks) {
+          const y = Math.floor(p / DIFF_COLS.length), x = p % DIFF_COLS.length, c = DIFF_COLS[x];
+          dst[y][c.key] = c.type === 'num' ? mutateNum(src[y][c.key]) : mutateText(src[y][c.key]);
+          if (fmtCell(c, dst[y][c.key]) !== fmtCell(c, src[y][c.key])) diffs.add(`${y}-${x}`);
+        }
+        found = 0;
+        q('src').innerHTML = table(src, 'src');
+        q('dst').innerHTML = table(dst, 'dst');
+        q('round').textContent = `${round + 1} / ${DIFF_ROUNDS.length}`;
+        q('left').textContent = diffs.size;
+      }
+      q('dst').addEventListener('click', (e) => {
+        const td = e.target.closest('td[data-c]');
+        if (!td || done || ctx.paused() || td.classList.contains('found')) return;
+        const key = td.dataset.c;
+        if (diffs.has(key)) {
+          td.classList.add('found');
+          q('src').querySelector(`td[data-c="${key}"]`).classList.add('found');
+          found++;
+          q('left').textContent = diffs.size - found;
+          if (found === diffs.size) {
+            round++;
+            if (round >= DIFF_ROUNDS.length) {
+              done = true;
+              T.timeout(() => ctx.finish(Math.round(elapsed() * 10) / 10), 500);
+            } else {
+              T.timeout(startRound, 700);
+            }
+          }
+        } else {
+          wrong++;
+          q('wrong').textContent = wrong;
+          bump(td, 'miss');
+        }
+      });
+      T.interval(() => (q('time').textContent = elapsed().toFixed(1) + '초'), 100);
+      startRound();
+      return { destroy: T.clear };
+    },
+  });
 })();

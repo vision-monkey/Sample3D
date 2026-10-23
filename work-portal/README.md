@@ -69,6 +69,10 @@ WK-111(30×16, 리스크 99개) 기록을 받으려면 SQL Editor에서 `supabas
 
 WK-112(똥 피하기) 기록을 받으려면 SQL Editor에서 `supabase-dodge.sql`을 한 번 실행하세요. 이 파일에는 `supabase-hard.sql` 내용도 포함되어 있습니다.
 
+### 데이터 정합성 검증 (기존 DB)
+
+WK-113(엑셀 틀린그림 찾기) 기록을 받으려면 SQL Editor에서 `supabase-diff.sql`을 한 번 실행하세요. 이전 게임 추가 SQL 내용도 모두 포함되어 있습니다.
+
 ## 동료와 같이 쓰기 (GitHub Pages)
 
 저장소 **Settings → Pages** → Source: `Deploy from a branch`, 브랜치 선택, 폴더 `/ (root)` → Save.
@@ -90,4 +94,5 @@ WK-112(똥 피하기) 기록을 받으려면 SQL Editor에서 `supabase-dodge.sq
 | `supabase-stats.sql` | 방문 통계 SQL |
 | `supabase-hard.sql` | 고급 지뢰찾기(risk_hard) 기록 허용 SQL |
 | `supabase-dodge.sql` | 업무 폭탄 회피(dodge) + 고급 지뢰찾기 기록 허용 SQL |
+| `supabase-diff.sql` | 데이터 정합성 검증(diff) + 이전 추가 게임 기록 허용 SQL |
 | `privacy.html` | 개인정보처리방침 |
