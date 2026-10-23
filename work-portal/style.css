@@ -500,3 +500,31 @@ button { font: inherit; color: inherit; }
   .diff-wrap { grid-template-columns: minmax(0, 1fr); }
   .diff-sheet td { padding: 5px 5px; font-size: 11px; }
 }
+
+/* ---------- 단체 ---------- */
+.scope-seg button { font-size: 12px; padding: 5px 10px; max-width: 160px; }
+.scope-seg button.on { background: var(--accent); color: #fff; }
+.scope-banner {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin-bottom: 14px;
+  padding: 9px 14px; border: 1px solid #c9dbf5; background: var(--accent-2); border-radius: var(--radius); font-size: 12px; color: #1f3f7a;
+}
+.scope-banner .btn { margin-left: auto; }
+.org-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.org-actions { margin-top: 14px; display: flex; justify-content: flex-end; }
+.org-scope { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; background: #f8f9fb; border: 1px solid var(--line); border-radius: var(--radius); font-size: 12px; }
+.org-scope .btn { margin-left: auto; }
+.org-leave { margin-top: 22px; padding-top: 14px; border-top: 1px dashed var(--line); }
+.org-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 9px; border-radius: 12px; background: var(--accent-2); color: var(--accent); font-size: 12px; }
+.chip button { border: 0; background: none; color: inherit; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 4px; }
+.chip button:hover { color: var(--ng); }
+.inp.code { font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.06em; text-transform: uppercase; }
+select.inp { height: 36px; }
+.org-note { margin-top: 16px; padding: 10px 12px; border: 1px solid #c9dbf5; background: var(--accent-2); border-radius: var(--radius); font-size: 13px; line-height: 1.6; }
+@media (max-width: 860px) {
+  .org-grid { grid-template-columns: minmax(0, 1fr); }
+  .scope-seg button { max-width: 96px; padding: 5px 8px; }
+}
+@media (max-width: 560px) {
+  .topbar:has(.scope-seg:not(.hidden)) .search { display: none; }
+}
