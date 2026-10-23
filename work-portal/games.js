@@ -1028,4 +1028,243 @@ window.WP_GAMES = [];
       });
     },
   });
+
+  /* ------------------------------------------------------------------
+   * WK-112 업무 폭탄 회피 (똥 피하기)
+   * ------------------------------------------------------------------ */
+  const BOMBS = ['긴급', '추가 요청', '주말 출근', '보고서 수정', '회의 소집', '재검토', 'ASAP', '야근', '자료 취합', '오늘까지', '전수 조사', '자료 정리', '양식 변경'];
+  const SENDERS = ['부장님', '본부장님', '팀장님', '상무님', '고객사'];
+  G.push({
+    id: 'dodge',
+    code: 'WK-112',
+    title: '업무 폭탄 회피',
+    short: '쏟아지는 업무 폭탄 피하며 버티기',
+    desc: '윗선에서 쏟아지는 업무 폭탄을 피하며 최대한 오래 버팁니다. 시간이 갈수록 업무가 더 많이, 더 빨리 떨어집니다.',
+    howto: ['← → 키 (A / D) 또는 하단 버튼으로 이동, 첫 이동부터 시간 측정', '업무 폭탄에 맞으면 종료되며 버틴 시간이 실적입니다', '☕ 커피를 받으면 3초간 업무 면역'],
+    higher: true,
+    fmt: sec1,
+    mount(root, ctx) {
+      const W = Math.max(300, Math.min(root.clientWidth || 600, 720));
+      const H = W < 500 ? 380 : 440;
+      const TOP = 34; // 결재라인 표시 영역
+      root.innerHTML = `
+        <div class="g-stats">
+          <span>버틴 시간 <b data-k="time">0.0초</b></span>
+          <span>회피한 업무 <b data-k="dodged">0</b>건</span>
+          <span class="muted" data-k="msg">← → 키를 누르면 시작합니다</span>
+        </div>
+        <div class="canvas-wrap"><canvas></canvas></div>
+        <div class="dpad dodge-pad">
+          <div><button class="btn" data-d="-1">◀ 왼쪽</button><button class="btn" data-d="1">오른쪽 ▶</button></div>
+        </div>`;
+      const q = (k) => root.querySelector(`[data-k="${k}"]`);
+      const canvas = root.querySelector('canvas');
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      canvas.style.width = W + 'px';
+      canvas.style.height = H + 'px';
+      const g = canvas.getContext('2d');
+      g.scale(dpr, dpr);
+
+      const me = { x: W / 2, y: H - 26, w: 46, h: 24, speed: 300 };
+      let items = [], pops = [];
+      let started = false, over = false, t = 0, dodged = 0, shield = 0, spawnIn = 0.6, coffeeIn = 9;
+      let raf = 0, last = 0, dir = 0;
+      const held = { left: false, right: false, pad: 0 };
+
+      g.font = 'bold 12px sans-serif';
+      function spawn(coffee) {
+        const label = coffee ? '☕ 커피' : BOMBS[rand(BOMBS.length)];
+        const w = Math.max(48, g.measureText(label).width + 18);
+        items.push({
+          coffee,
+          label,
+          from: SENDERS[rand(SENDERS.length)],
+          w,
+          h: 22,
+          x: w / 2 + Math.random() * (W - w),
+          y: TOP - 10,
+          vy: coffee ? 140 : (110 + t * 7) * (0.75 + Math.random() * 0.5),
+        });
+      }
+      function roundRect(x, y, w, h, r) {
+        g.beginPath();
+        g.moveTo(x + r, y);
+        g.arcTo(x + w, y, x + w, y + h, r);
+        g.arcTo(x + w, y + h, x, y + h, r);
+        g.arcTo(x, y + h, x, y, r);
+        g.arcTo(x, y, x + w, y, r);
+        g.closePath();
+      }
+      function draw() {
+        g.fillStyle = '#fff';
+        g.fillRect(0, 0, W, H);
+        g.strokeStyle = '#eef1f5';
+        g.lineWidth = 1;
+        for (let x = 0; x <= W; x += 40) { g.beginPath(); g.moveTo(x + 0.5, TOP); g.lineTo(x + 0.5, H); g.stroke(); }
+        for (let y = TOP; y <= H; y += 24) { g.beginPath(); g.moveTo(0, y + 0.5); g.lineTo(W, y + 0.5); g.stroke(); }
+        // 결재라인
+        g.fillStyle = '#f1f3f6';
+        g.fillRect(0, 0, W, TOP);
+        g.fillStyle = '#7a8599';
+        g.font = '11px sans-serif';
+        g.textAlign = 'left';
+        g.textBaseline = 'middle';
+        g.fillText('결재라인 ▼  ' + SENDERS.slice(0, W < 500 ? 3 : 5).join(' · '), 10, TOP / 2);
+        // 업무 폭탄
+        g.font = 'bold 12px sans-serif';
+        g.textAlign = 'center';
+        for (const it of items) {
+          roundRect(it.x - it.w / 2, it.y - it.h / 2, it.w, it.h, 4);
+          g.fillStyle = it.coffee ? '#e6f4ea' : '#fdecea';
+          g.fill();
+          g.strokeStyle = it.coffee ? '#1e8e3e' : '#d93025';
+          g.stroke();
+          g.fillStyle = it.coffee ? '#1e8e3e' : '#c5221f';
+          g.fillText(it.label, it.x, it.y + 1);
+        }
+        // 나
+        if (shield > 0) {
+          g.beginPath();
+          g.arc(me.x, me.y, 30, 0, Math.PI * 2);
+          g.fillStyle = 'rgba(30,142,62,0.12)';
+          g.fill();
+          g.strokeStyle = '#1e8e3e';
+          g.stroke();
+        }
+        roundRect(me.x - me.w / 2, me.y - me.h / 2, me.w, me.h, 5);
+        g.fillStyle = over ? '#d93025' : '#2f6fde';
+        g.fill();
+        g.fillStyle = '#fff';
+        g.font = 'bold 13px sans-serif';
+        g.fillText('나', me.x, me.y + 1);
+        // 떠오르는 문구
+        g.font = 'bold 12px sans-serif';
+        for (const p of pops) {
+          g.globalAlpha = Math.max(0, p.life);
+          g.fillStyle = p.color;
+          g.fillText(p.text, p.x, p.y);
+        }
+        g.globalAlpha = 1;
+        if (!started) {
+          g.fillStyle = 'rgba(31,42,60,0.75)';
+          g.font = '13px sans-serif';
+          g.fillText('← → 키 또는 아래 버튼으로 이동하면 시작', W / 2, H / 2);
+        }
+      }
+      function hit(a) {
+        // 판정은 조금 너그럽게
+        return Math.abs(a.x - me.x) < (a.w + me.w) / 2 - 4 && Math.abs(a.y - me.y) < (a.h + me.h) / 2 - 4;
+      }
+      function step(dt) {
+        t += dt;
+        dir = (held.right ? 1 : 0) - (held.left ? 1 : 0) || held.pad;
+        me.x = Math.max(me.w / 2, Math.min(W - me.w / 2, me.x + dir * me.speed * dt));
+        shield = Math.max(0, shield - dt);
+        spawnIn -= dt;
+        if (spawnIn <= 0) {
+          spawn(false);
+          if (t > 20 && Math.random() < 0.3) spawn(false);
+          spawnIn = Math.max(0.16, 0.75 - t * 0.012) * (0.7 + Math.random() * 0.6);
+        }
+        coffeeIn -= dt;
+        if (coffeeIn <= 0) {
+          spawn(true);
+          coffeeIn = 10 + Math.random() * 6;
+        }
+        for (const it of items) {
+          it.y += it.vy * dt;
+          if (it.dead || !hit(it)) continue;
+          it.dead = true;
+          if (it.coffee) {
+            shield = 3;
+            pops.push({ text: '업무 면역 3초!', x: me.x, y: me.y - 26, life: 1.2, color: '#1e8e3e' });
+          } else if (shield > 0) {
+            pops.push({ text: '반려!', x: it.x, y: it.y, life: 0.8, color: '#1e8e3e' });
+          } else {
+            pops.push({ text: `${it.from}: ${it.label}`, x: Math.min(Math.max(me.x, 70), W - 70), y: me.y - 28, life: 2, color: '#d93025' });
+            return end();
+          }
+        }
+        items = items.filter((it) => {
+          if (it.dead) return false;
+          if (it.y - it.h / 2 > H) {
+            if (!it.coffee) dodged++;
+            return false;
+          }
+          return true;
+        });
+        pops = pops.filter((p) => ((p.life -= dt), (p.y -= 30 * dt), p.life > 0));
+        q('time').textContent = t.toFixed(1) + '초';
+        q('dodged').textContent = dodged;
+      }
+      function loop(ts) {
+        const dt = Math.min(0.05, (ts - last) / 1000 || 0);
+        last = ts;
+        if (!over && started && !ctx.paused()) step(dt);
+        draw();
+        if (!over) raf = requestAnimationFrame(loop);
+      }
+      function begin() {
+        if (started || over) return;
+        started = true;
+        q('msg').textContent = '업무 폭탄 낙하 중…';
+      }
+      let endTimer = 0;
+      function end() {
+        over = true;
+        draw();
+        q('msg').textContent = '💥 업무 폭탄에 맞았습니다';
+        const score = Math.round(t * 10) / 10;
+        endTimer = setTimeout(() => (score >= 1 ? ctx.finish(score) : ctx.fail('시작하자마자 업무 폭탄에 맞았습니다.')), 900);
+      }
+      const KEYS = { ArrowLeft: 'left', ArrowRight: 'right', a: 'left', d: 'right' };
+      const onDown = (e) => {
+        if (e.target.tagName === 'INPUT') return;
+        const k = KEYS[e.key];
+        if (!k) return;
+        e.preventDefault();
+        if (ctx.paused()) return;
+        held[k] = true;
+        begin();
+      };
+      const onUp = (e) => {
+        const k = KEYS[e.key];
+        if (k) held[k] = false;
+      };
+      document.addEventListener('keydown', onDown);
+      document.addEventListener('keyup', onUp);
+      // 모바일: 버튼을 누르고 있는 동안 이동, 캔버스 좌우 절반 터치도 지원
+      const press = (d) => {
+        held.pad = d;
+        if (d) begin();
+      };
+      const pad = root.querySelector('.dodge-pad');
+      pad.addEventListener('pointerdown', (e) => {
+        const b = e.target.closest('[data-d]');
+        if (b) { e.preventDefault(); press(+b.dataset.d); }
+      });
+      canvas.addEventListener('pointerdown', (e) => {
+        const r = canvas.getBoundingClientRect();
+        press(e.clientX - r.left < r.width / 2 ? -1 : 1);
+      });
+      const release = () => press(0);
+      window.addEventListener('pointerup', release);
+      window.addEventListener('pointercancel', release);
+      canvas.style.touchAction = 'none';
+      raf = requestAnimationFrame(loop);
+      return {
+        destroy() {
+          over = true;
+          cancelAnimationFrame(raf);
+          clearTimeout(endTimer);
+          document.removeEventListener('keydown', onDown);
+          document.removeEventListener('keyup', onUp);
+          window.removeEventListener('pointerup', release);
+          window.removeEventListener('pointercancel', release);
+        },
+      };
+    },
+  });
 })();

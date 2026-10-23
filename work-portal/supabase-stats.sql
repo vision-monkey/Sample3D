@@ -28,7 +28,7 @@ create or replace function public.track(p_kind text, p_game text, p_visitor text
 language plpgsql security definer set search_path = public as $$
 begin
   if p_kind not in ('visit', 'play', 'record')
-     or (p_game is not null and p_game not in ('report','risk','budget','approve','inbox','settle','urgent','match','pipeline','order','risk_hard'))
+     or (p_game is not null and p_game not in ('report','risk','budget','approve','inbox','settle','urgent','match','pipeline','order','risk_hard','dodge'))
      or p_visitor is null or p_visitor !~ '^[A-Za-z0-9_-]{8,40}$' then
     return;
   end if;

@@ -65,6 +65,10 @@ IP·이름은 저장하지 않고 브라우저별 임의 ID만 쓰며, 13개월 
 
 WK-111(30×16, 리스크 99개) 기록을 받으려면 SQL Editor에서 `supabase-hard.sql`을 한 번 실행하세요. 기존 기록은 그대로입니다.
 
+### 업무 폭탄 회피 (기존 DB)
+
+WK-112(똥 피하기) 기록을 받으려면 SQL Editor에서 `supabase-dodge.sql`을 한 번 실행하세요. 이 파일에는 `supabase-hard.sql` 내용도 포함되어 있습니다.
+
 ## 동료와 같이 쓰기 (GitHub Pages)
 
 저장소 **Settings → Pages** → Source: `Deploy from a branch`, 브랜치 선택, 폴더 `/ (root)` → Save.
@@ -85,4 +89,5 @@ WK-111(30×16, 리스크 99개) 기록을 받으려면 SQL Editor에서 `supabas
 | `supabase-secure.sql` | 점수 검증·등록 제한·금칙어 SQL |
 | `supabase-stats.sql` | 방문 통계 SQL |
 | `supabase-hard.sql` | 고급 지뢰찾기(risk_hard) 기록 허용 SQL |
+| `supabase-dodge.sql` | 업무 폭탄 회피(dodge) + 고급 지뢰찾기 기록 허용 SQL |
 | `privacy.html` | 개인정보처리방침 |
