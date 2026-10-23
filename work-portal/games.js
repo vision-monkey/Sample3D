@@ -1045,8 +1045,9 @@ window.WP_GAMES = [];
     higher: true,
     fmt: sec1,
     mount(root, ctx) {
-      const W = Math.max(300, Math.min(root.clientWidth || 600, 720));
-      const H = W < 500 ? 380 : 440;
+      // 휴대폰 화면 같은 세로형 (최대 폭 360px) — 기기마다 같은 밀도로 업무가 떨어진다
+      const W = Math.max(280, Math.min((root.clientWidth || 392) - 32, 360));
+      const H = Math.round(W * 1.45);
       const TOP = 34; // 결재라인 표시 영역
       root.innerHTML = `
         <div class="g-stats">
