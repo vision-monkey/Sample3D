@@ -1034,13 +1034,14 @@ window.WP_GAMES = [];
    * ------------------------------------------------------------------ */
   const BOMBS = ['긴급', '추가 요청', '주말 출근', '보고서 수정', '회의 소집', '재검토', 'ASAP', '야근', '자료 취합', '오늘까지', '전수 조사', '자료 정리', '양식 변경'];
   const SENDERS = ['부장님', '본부장님', '팀장님', '상무님', '고객사'];
+  const URGENT = ['긴급', 'ASAP', '오늘까지'];
   G.push({
     id: 'dodge',
     code: 'WK-112',
     title: '업무 폭탄 회피',
     short: '쏟아지는 업무 폭탄 피하며 버티기',
-    desc: '윗선에서 쏟아지는 업무 폭탄을 피하며 최대한 오래 버팁니다. 시간이 갈수록 업무가 더 많이, 더 빨리 떨어집니다.',
-    howto: ['← → 키 (A / D) 또는 하단 버튼으로 이동, 첫 이동부터 시간 측정', '업무 폭탄에 맞으면 종료되며 버틴 시간이 실적입니다', '☕ 커피를 받으면 3초간 업무 면역'],
+    desc: '윗선에서 쏟아지는 업무 폭탄을 피하며 최대한 오래 버팁니다. 처음부터 빠르고, 시간이 갈수록 업무가 더 많이, 더 빨리, 더 변칙적으로 떨어집니다.',
+    howto: ['← → 키 (A / D) 또는 하단 버튼으로 이동, 첫 이동부터 시간 측정', '업무 폭탄에 맞으면 종료되며 버틴 시간이 실적입니다', '☕ 커피를 받으면 2초간 업무 면역 (커피는 드물게 내려옵니다)', '빨간 테두리가 굵은 긴급 업무는 더 빨리 떨어지고, 시간이 지나면 옆으로 흔들리며 떨어지는 업무도 나옵니다'],
     higher: true,
     fmt: sec1,
     mount(root, ctx) {
@@ -1069,7 +1070,7 @@ window.WP_GAMES = [];
 
       const me = { x: W / 2, y: H - 26, w: 46, h: 24, speed: 300 };
       let items = [], pops = [];
-      let started = false, over = false, t = 0, dodged = 0, shield = 0, spawnIn = 0.6, coffeeIn = 9;
+      let started = false, over = false, t = 0, dodged = 0, shield = 0, spawnIn = 0.4, coffeeIn = 14;
       let raf = 0, last = 0, dir = 0;
       const held = { left: false, right: false, pad: 0 };
 
@@ -1085,7 +1086,10 @@ window.WP_GAMES = [];
           h: 22,
           x: w / 2 + Math.random() * (W - w),
           y: TOP - 10,
-          vy: coffee ? 140 : (110 + t * 7) * (0.75 + Math.random() * 0.5),
+          urgent: !coffee && URGENT.includes(label),
+          vy: coffee ? 150 : (150 + t * 9) * (0.8 + Math.random() * 0.5) * (URGENT.includes(label) ? 1.4 : 1),
+          // 12초가 지나면 일부 업무는 옆으로 흔들리며 떨어진다
+          vx: !coffee && t > 12 && Math.random() < 0.35 ? (Math.random() < 0.5 ? -1 : 1) * (30 + Math.random() * 60) : 0,
         });
       }
       function roundRect(x, y, w, h, r) {
@@ -1120,7 +1124,9 @@ window.WP_GAMES = [];
           g.fillStyle = it.coffee ? '#e6f4ea' : '#fdecea';
           g.fill();
           g.strokeStyle = it.coffee ? '#1e8e3e' : '#d93025';
+          g.lineWidth = it.urgent ? 2.5 : 1;
           g.stroke();
+          g.lineWidth = 1;
           g.fillStyle = it.coffee ? '#1e8e3e' : '#c5221f';
           g.fillText(it.label, it.x, it.y + 1);
         }
@@ -1155,7 +1161,7 @@ window.WP_GAMES = [];
       }
       function hit(a) {
         // 판정은 조금 너그럽게
-        return Math.abs(a.x - me.x) < (a.w + me.w) / 2 - 4 && Math.abs(a.y - me.y) < (a.h + me.h) / 2 - 4;
+        return Math.abs(a.x - me.x) < (a.w + me.w) / 2 - 3 && Math.abs(a.y - me.y) < (a.h + me.h) / 2 - 3;
       }
       function step(dt) {
         t += dt;
@@ -1165,21 +1171,26 @@ window.WP_GAMES = [];
         spawnIn -= dt;
         if (spawnIn <= 0) {
           spawn(false);
-          if (t > 20 && Math.random() < 0.3) spawn(false);
-          spawnIn = Math.max(0.16, 0.75 - t * 0.012) * (0.7 + Math.random() * 0.6);
+          if (t > 6 && Math.random() < 0.35) spawn(false);
+          if (t > 25 && Math.random() < 0.3) spawn(false);
+          spawnIn = Math.max(0.1, 0.5 - t * 0.012) * (0.6 + Math.random() * 0.6);
         }
         coffeeIn -= dt;
         if (coffeeIn <= 0) {
           spawn(true);
-          coffeeIn = 10 + Math.random() * 6;
+          coffeeIn = 16 + Math.random() * 8;
         }
         for (const it of items) {
           it.y += it.vy * dt;
+          if (it.vx) {
+            it.x += it.vx * dt;
+            if (it.x < it.w / 2 || it.x > W - it.w / 2) it.vx = -it.vx;
+          }
           if (it.dead || !hit(it)) continue;
           it.dead = true;
           if (it.coffee) {
-            shield = 3;
-            pops.push({ text: '업무 면역 3초!', x: me.x, y: me.y - 26, life: 1.2, color: '#1e8e3e' });
+            shield = 2;
+            pops.push({ text: '업무 면역 2초!', x: me.x, y: me.y - 26, life: 1.2, color: '#1e8e3e' });
           } else if (shield > 0) {
             pops.push({ text: '반려!', x: it.x, y: it.y, life: 0.8, color: '#1e8e3e' });
           } else {
