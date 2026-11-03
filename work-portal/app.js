@@ -115,6 +115,7 @@
       `<a href="#/" data-nav=""><span class="nav-ico">▦</span>대시보드</a>`,
       `<a href="#/ranking" data-nav="ranking"><span class="nav-ico">▲</span>실적 현황</a>`,
       `<a href="#/groups" data-nav="groups"><span class="nav-ico">⚑</span>그룹 대항전</a>`,
+      `<a href="race.html"><span class="nav-ico">◉</span>실시간 부서 레이스</a>`,
       `<div class="nav-sec">업무 모듈</div>`,
       ...GAMES.map((g) => `<a href="#/game/${g.id}" data-nav="game/${g.id}"><span class="nav-code">${g.code.slice(3)}</span>${g.title}</a>`),
     ];
